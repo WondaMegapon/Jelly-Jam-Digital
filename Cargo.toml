@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 hecs = "0.10.5"
-sdl2 = "0.37.0"
+wgpu = "22.1.0"
+winit = "0.30.5"
