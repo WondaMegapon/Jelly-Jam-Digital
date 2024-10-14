@@ -1,34 +1,103 @@
-use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::window::{Window, WindowId};
+mod rules;
 
-#[derive(Default)]
-struct App {
-    window: Option<Window>,
+use macroquad::prelude::*;
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum GameState {
+    Menu,
+    Rules,
 }
 
-impl ApplicationHandler for App {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        self.window = Some(event_loop.create_window(Window::default_attributes()).unwrap());
-    }
+#[macroquad::main("Jelly Jam")]
+async fn main() {
+    let mut state = GameState::Menu;
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, id: WindowId, event: WindowEvent) {
-        match event {
-            WindowEvent::CloseRequested => {
-                event_loop.exit();
-            },
-            WindowEvent::RedrawRequested => {
-                self.window.as_ref().unwrap().request_redraw();
+    // Load textures at the start
+    let background_texture = load_texture("C:\\Users\\CraCr\\Documents\\Projects\\JellyJam\\jelly_jam\\assets\\title.png")
+        .await
+        .expect("Failed to load background texture. Make sure the file exists.");
+    
+    let rules_texture = load_texture("C:\\Users\\CraCr\\Documents\\Projects\\JellyJam\\jelly_jam\\assets\\rules.png")
+        .await
+        .expect("Failed to load rules texture. Make sure the file exists.");
+
+    // Main game loop
+    loop {
+        // Clear the screen each frame
+        clear_background(BLACK);
+
+        // Match the game state and draw the relevant screen
+        match state {
+            GameState::Menu => {
+                // Draw the background texture for the main menu
+                draw_texture(background_texture, 0.0, 0.0, WHITE);
+
+                let buttons = vec![
+                    ("Single Play", GREEN),
+                    ("Multi Play", SKYBLUE),
+                    ("Rules", VIOLET),
+                    ("Settings", ORANGE),
+                    ("Quit", RED),
+                ];
+
+                let button_width = screen_width() * 0.5;
+                let button_height = 80.0;
+                let button_spacing = 10.0;
+
+                for (i, (label, color)) in buttons.iter().enumerate() {
+                    let y = screen_height() * 0.4 + (i as f32 * (button_height + button_spacing));
+
+                    // Draw button background
+                    draw_rectangle(screen_width() * 0.25, y, button_width, button_height, *color);
+
+                    // Draw button text
+                    draw_text_ex(
+                        label,
+                        screen_width() * 0.35,
+                        y + button_height / 2.0 + 10.0,
+                        TextParams {
+                            font: Font::default(),
+                            font_size: 40,
+                            color: WHITE,
+                            ..Default::default()
+                        },
+                    );
+
+                    // Handle button clicks
+                    if is_mouse_button_pressed(MouseButton::Left) {
+                        let mouse_x = mouse_position().0;
+                        let mouse_y = mouse_position().1;
+
+                        if mouse_x > screen_width() * 0.25
+                            && mouse_x < screen_width() * 0.25 + button_width
+                            && mouse_y > y
+                            && mouse_y < y + button_height
+                        {
+                            match *label {
+                                "Single Play" => println!("Single Play button clicked!"),
+                                "Multi Play" => println!("Multi Play button clicked!"),
+                                "Rules" => {
+                                    println!("Rules button clicked!");
+                                    state = GameState::Rules;  // Switch to the Rules state
+                                }
+                                "Settings" => println!("Settings button clicked!"),
+                                "Quit" => {
+                                    println!("Quit button clicked!");
+                                    std::process::exit(0);
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
             }
-            _ => (),
+            GameState::Rules => {
+                // Call the draw_rules function from the rules module, passing the texture and state
+                rules::draw_rules(&rules_texture, &mut state);
+            }
         }
-    }
-}
 
-fn main() {
-    let event_loop = EventLoop::with_user_event().build().unwrap();
-    event_loop.set_control_flow(ControlFlow::Poll);
-    let mut app = App::default();
-    event_loop.run_app(&mut app).unwrap();
+        // Synchronize the frame
+        next_frame().await;
+    }
 }

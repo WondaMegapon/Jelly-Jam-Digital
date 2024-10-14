@@ -1,9 +1,7 @@
 [package]
-name = "jelly-jam-digital"
+name = "jelly_jam"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-hecs = "0.10.5"
-wgpu = "22.1.0"
-winit = "0.30.5"
+macroquad = "0.3.16"
