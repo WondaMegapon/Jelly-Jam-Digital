@@ -1,14 +1,9 @@
 mod rules;
 mod view_card;
 use macroquad::prelude::*;
-use std::env;
 
 #[macroquad::main("Jelly Jam")]
 async fn main() {
-    // Debug: Print current directory
-    let current_dir = env::current_dir().expect("Failed to get current directory");
-    println!("Current directory: {:?}", current_dir);
-
     let mut state = GameState::Menu;
 
     // Load textures at the start
