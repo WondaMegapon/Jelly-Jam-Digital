@@ -12,13 +12,11 @@ async fn main() {
     let mut state = GameState::Menu;
 
     // Load textures at the start
-    let background_texture = load_texture("assets/title/title.png")
-        .await
-        .expect("Failed to load background texture. Make sure the file exists in assets folder.");
+    let background_texture =
+        Texture2D::from_file_with_format(include_bytes!("../assets/title/title.png"), None);
 
-    let rules_texture = load_texture("assets/rules/rules.png")
-        .await
-        .expect("Failed to load rules texture. Make sure the file exists in assets folder.");
+    let rules_texture =
+        Texture2D::from_file_with_format(include_bytes!("../assets/rules/rules.png"), None);
 
     // Load card textures using the view_card module
     let card_textures = view_card::load_card_textures().await;
@@ -34,7 +32,7 @@ async fn main() {
                 // Draw the background texture for the main menu with scaling to fit the screen
                 let texture_width = background_texture.width();
                 let texture_height = background_texture.height();
-                
+
                 // Calculate the scaling factor to fit the texture to the screen
                 let _scale_x = screen_width() / texture_width;
                 let _scale_y = screen_height() / texture_height;
@@ -97,7 +95,7 @@ async fn main() {
                                 "Multi Play" => println!("Multi Play button clicked!"),
                                 "Rules" => {
                                     println!("Rules button clicked!");
-                                    state = GameState::Rules;  // Switch to the Rules state
+                                    state = GameState::Rules; // Switch to the Rules state
                                 }
                                 "Settings" => println!("Settings button clicked!"),
                                 "Quit" => {
@@ -124,7 +122,6 @@ async fn main() {
         next_frame().await;
     }
 }
-
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum GameState {

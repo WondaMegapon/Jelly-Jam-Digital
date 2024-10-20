@@ -1,25 +1,30 @@
-use macroquad::prelude::*;
 use crate::GameState;
+use include_dir::include_dir;
+use macroquad::prelude::*;
 
 // Function to load card textures
 pub async fn load_card_textures() -> Vec<Texture2D> {
-    let card_paths = vec![
-        "assets/cards/jelly/Junior_Jelly.png",
-        "assets/cards/jelly/Sling_Jelly.png",
-        "assets/cards/mutation/Super.png",
-        "assets/cards/item/Nab_Net.png",
-        "assets/cards/creature/Kibble.png",
-        "assets/cards/creature/Taki.png",
-        // Add more card paths as needed
-    ];
+    let card_paths = include_dir!("./assets/cards/");
+    // let card_paths = vec![
+    //     include_bytes!("../assets/cards/jelly/Junior_Jelly.png"),
+    //     include_bytes!("../assets/cards/jelly/Sling_Jelly.png"),
+    //     include_bytes!("../assets/cards/mutation/Super.png"),
+    //     include_bytes!("../assets/cards/item/Nab_Net.png"),
+    //     include_bytes!("../assets/cards/creature/Kibble.png"),
+    //     include_bytes!("../assets/cards/creature/Taki.png"),
+    //     // Add more card paths as needed
+    // ];
 
     let mut card_textures = Vec::new();
 
-    for path in card_paths {
-        let texture = load_texture(path)
-            .await
-            .expect(&format!("Failed to load texture from {}", path));
-        card_textures.push(texture);
+    for directories in card_paths.dirs() {
+        for path in directories.files() {
+            if path.path().extension().unwrap() == "png" {
+                println!("{:?}", &path.path().to_str());
+                let texture = Texture2D::from_file_with_format(path.contents(), None);
+                card_textures.push(texture);
+            }
+        }
     }
 
     card_textures
@@ -52,10 +57,16 @@ pub fn draw_view_cards(card_textures: &[Texture2D], state: &mut GameState) {
         let y = start_y + row as f32 * (card_height + spacing);
 
         // Draw the card texture
-        draw_texture_ex(*texture, x, y, WHITE, DrawTextureParams {
-            dest_size: Some(Vec2::new(card_width, card_height)), // Scale card to the calculated dimensions
-            ..Default::default()
-        });
+        draw_texture_ex(
+            *texture,
+            x,
+            y,
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(Vec2::new(card_width, card_height)), // Scale card to the calculated dimensions
+                ..Default::default()
+            },
+        );
     }
 
     // Draw a simple "Back" button
@@ -71,4 +82,3 @@ pub fn draw_view_cards(card_textures: &[Texture2D], state: &mut GameState) {
         }
     }
 }
-
