@@ -9,6 +9,7 @@ pub async fn load_card_textures() -> Vec<Texture2D> {
         "assets/cards/mutation/Super.png",
         "assets/cards/item/Nab_Net.png",
         "assets/cards/creature/Kibble.png",
+        "assets/cards/creature/Taki.png",
         // Add more card paths as needed
     ];
 
@@ -31,13 +32,15 @@ pub fn draw_view_cards(card_textures: &[Texture2D], state: &mut GameState) {
 
     // Grid layout settings
     let cols = 3; // Number of columns
-    let rows = (card_textures.len() + cols - 1) / cols; // Calculate rows needed
-    let card_width = 100.0; // Width of each card
-    let card_height = 150.0; // Height of each card
     let spacing = 20.0; // Space between cards
 
+    // Calculate card dimensions based on screen size
+    let screen_width = screen_width();
+    let card_width = (screen_width - (spacing * (cols as f32 + 1.0))) / cols as f32; // Width of each card
+    let card_height = card_width * 1.5; // Maintain aspect ratio (1.5:1)
+
     // Calculate starting position
-    let start_x = (screen_width() - (cols as f32 * (card_width + spacing))) / 2.0;
+    let start_x = spacing; // Starting X position with spacing
     let start_y = 100.0; // Starting Y position
 
     // Draw each card in the grid
@@ -49,7 +52,10 @@ pub fn draw_view_cards(card_textures: &[Texture2D], state: &mut GameState) {
         let y = start_y + row as f32 * (card_height + spacing);
 
         // Draw the card texture
-        draw_texture(*texture, x, y, WHITE);
+        draw_texture_ex(*texture, x, y, WHITE, DrawTextureParams {
+            dest_size: Some(Vec2::new(card_width, card_height)), // Scale card to the calculated dimensions
+            ..Default::default()
+        });
     }
 
     // Draw a simple "Back" button
@@ -65,3 +71,4 @@ pub fn draw_view_cards(card_textures: &[Texture2D], state: &mut GameState) {
         }
     }
 }
+
