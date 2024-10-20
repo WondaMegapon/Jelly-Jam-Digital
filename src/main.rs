@@ -1,25 +1,27 @@
 mod rules;
-
+mod view_card;
 use macroquad::prelude::*;
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum GameState {
-    Menu,
-    Rules,
-}
+use std::env;
 
 #[macroquad::main("Jelly Jam")]
 async fn main() {
+    // Debug: Print current directory
+    let current_dir = env::current_dir().expect("Failed to get current directory");
+    println!("Current directory: {:?}", current_dir);
+
     let mut state = GameState::Menu;
 
     // Load textures at the start
-    let background_texture = load_texture("C:\\Users\\CraCr\\Documents\\Projects\\JellyJam\\jelly_jam\\assets\\title.png")
+    let background_texture = load_texture("assets/title/title.png")
         .await
-        .expect("Failed to load background texture. Make sure the file exists.");
-    
-    let rules_texture = load_texture("C:\\Users\\CraCr\\Documents\\Projects\\JellyJam\\jelly_jam\\assets\\rules.png")
+        .expect("Failed to load background texture. Make sure the file exists in assets folder.");
+
+    let rules_texture = load_texture("assets/rules/rules.png")
         .await
-        .expect("Failed to load rules texture. Make sure the file exists.");
+        .expect("Failed to load rules texture. Make sure the file exists in assets folder.");
+
+    // Load card textures using the view_card module
+    let card_textures = view_card::load_card_textures().await;
 
     // Main game loop
     loop {
@@ -29,9 +31,26 @@ async fn main() {
         // Match the game state and draw the relevant screen
         match state {
             GameState::Menu => {
-                // Draw the background texture for the main menu
-                draw_texture(background_texture, 0.0, 0.0, WHITE);
+                // Draw the background texture for the main menu with scaling to fit the screen
+                let texture_width = background_texture.width();
+                let texture_height = background_texture.height();
+                
+                // Calculate the scaling factor to fit the texture to the screen
+                let _scale_x = screen_width() / texture_width;
+                let _scale_y = screen_height() / texture_height;
 
+                draw_texture_ex(
+                    background_texture,
+                    0.0,
+                    0.0,
+                    WHITE,
+                    DrawTextureParams {
+                        dest_size: Some(Vec2::new(screen_width(), screen_height())), // Stretch to fit the screen
+                        ..Default::default()
+                    },
+                );
+
+                // Create and draw buttons, scaling them to fit the screen
                 let buttons = vec![
                     ("Single Play", GREEN),
                     ("Multi Play", SKYBLUE),
@@ -40,24 +59,24 @@ async fn main() {
                     ("Quit", RED),
                 ];
 
-                let button_width = screen_width() * 0.5;
-                let button_height = 80.0;
-                let button_spacing = 10.0;
+                let button_width = screen_width() * 0.6; // Adjust button width relative to screen
+                let button_height = screen_height() * 0.1; // Adjust button height relative to screen
+                let button_spacing = screen_height() * 0.008; // Adjust spacing relative to screen height
 
                 for (i, (label, color)) in buttons.iter().enumerate() {
-                    let y = screen_height() * 0.4 + (i as f32 * (button_height + button_spacing));
+                    let y = screen_height() * 0.45 + (i as f32 * (button_height + button_spacing));
 
                     // Draw button background
-                    draw_rectangle(screen_width() * 0.25, y, button_width, button_height, *color);
+                    draw_rectangle(screen_width() * 0.2, y, button_width, button_height, *color);
 
-                    // Draw button text
+                    // Draw button text, centering it within the button
                     draw_text_ex(
                         label,
                         screen_width() * 0.35,
                         y + button_height / 2.0 + 10.0,
                         TextParams {
                             font: Font::default(),
-                            font_size: 40,
+                            font_size: (screen_height() * 0.05) as u16, // Adjust text size relative to screen
                             color: WHITE,
                             ..Default::default()
                         },
@@ -68,8 +87,8 @@ async fn main() {
                         let mouse_x = mouse_position().0;
                         let mouse_y = mouse_position().1;
 
-                        if mouse_x > screen_width() * 0.25
-                            && mouse_x < screen_width() * 0.25 + button_width
+                        if mouse_x > screen_width() * 0.2
+                            && mouse_x < screen_width() * 0.2 + button_width
                             && mouse_y > y
                             && mouse_y < y + button_height
                         {
@@ -95,9 +114,21 @@ async fn main() {
                 // Call the draw_rules function from the rules module, passing the texture and state
                 rules::draw_rules(&rules_texture, &mut state);
             }
+            GameState::ViewCards => {
+                // Draw the view cards screen
+                view_card::draw_view_cards(&card_textures, &mut state);
+            }
         }
 
         // Synchronize the frame
         next_frame().await;
     }
+}
+
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum GameState {
+    Menu,
+    Rules,
+    ViewCards,
 }
