@@ -19,7 +19,7 @@ pub async fn load_card_textures() -> Vec<Texture2D> {
 
     for directories in card_paths.dirs() {
         for path in directories.files() {
-            if path.path().extension().unwrap() == "png" {
+            if path.path().extension().unwrap().to_ascii_lowercase() == "png" {
                 println!("{:?}", &path.path().to_str());
                 let texture = Texture2D::from_file_with_format(path.contents(), None);
                 card_textures.push(texture);
