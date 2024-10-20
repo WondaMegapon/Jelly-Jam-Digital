@@ -1,14 +1,7 @@
 mod rules;
-pub mod view_card;
+mod view_card;
 use macroquad::prelude::*;
 use std::env;
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum GameState {
-    Menu,
-    Rules,
-    ViewCards,
-}
 
 #[macroquad::main("Jelly Jam")]
 async fn main() {
@@ -27,6 +20,9 @@ async fn main() {
         .await
         .expect("Failed to load rules texture. Make sure the file exists in assets folder.");
 
+    // Load card textures using the view_card module
+    let card_textures = view_card::load_card_textures().await;
+
     // Main game loop
     loop {
         // Clear the screen each frame
@@ -40,8 +36,8 @@ async fn main() {
                 let texture_height = background_texture.height();
                 
                 // Calculate the scaling factor to fit the texture to the screen
-                let scale_x = screen_width() / texture_width;
-                let scale_y = screen_height() / texture_height;
+                let _scale_x = screen_width() / texture_width;
+                let _scale_y = screen_height() / texture_height;
 
                 draw_texture_ex(
                     background_texture,
@@ -120,11 +116,19 @@ async fn main() {
             }
             GameState::ViewCards => {
                 // Draw the view cards screen
-                view_card::draw_view_cards(&mut state);
+                view_card::draw_view_cards(&card_textures, &mut state);
             }
         }
 
         // Synchronize the frame
         next_frame().await;
     }
+}
+
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum GameState {
+    Menu,
+    Rules,
+    ViewCards,
 }

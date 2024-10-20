@@ -1,28 +1,33 @@
 use macroquad::prelude::*;
-use crate::GameState; // Import GameState from main.rs
+use crate::GameState;
 
-pub async fn draw_view_cards(state: &mut GameState) {
-    // Clear the background for the View Cards screen
-    clear_background(BLACK);
-
-    // Define paths to card images
+// Function to load card textures
+pub async fn load_card_textures() -> Vec<Texture2D> {
     let card_paths = vec![
-        "assets/cards/card1.png",
-        "assets/cards/card2.png",
-        "assets/cards/card3.png",
-        "assets/cards/card4.png",
-        "assets/cards/card5.png",
+        "assets/cards/jelly/Junior_Jelly.png",
+        "assets/cards/jelly/Sling_Jelly.png",
+        "assets/cards/mutation/Super.png",
+        "assets/cards/item/Nab_Net.png",
+        "assets/cards/creature/Kibble.png",
         // Add more card paths as needed
     ];
 
-    let card_textures: Vec<Texture2D> = card_paths
-        .iter()
-        .map(|path| {
-            load_texture(path)
-                .await
-                .expect(&format!("Failed to load texture from {}", path))
-        })
-        .collect();
+    let mut card_textures = Vec::new();
+
+    for path in card_paths {
+        let texture = load_texture(path)
+            .await
+            .expect(&format!("Failed to load texture from {}", path));
+        card_textures.push(texture);
+    }
+
+    card_textures
+}
+
+// Function to render the view cards screen
+pub fn draw_view_cards(card_textures: &[Texture2D], state: &mut GameState) {
+    // Clear the background for the View Cards screen
+    clear_background(BLACK);
 
     // Grid layout settings
     let cols = 3; // Number of columns
