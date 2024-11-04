@@ -50,4 +50,3 @@ pub fn draw_rules(rules_texture: &Texture2D, state: &mut GameState) {
         }
     }
 }
-
