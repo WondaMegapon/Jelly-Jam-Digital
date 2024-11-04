@@ -3,15 +3,7 @@ use crate::GameState;
 
 // Function to load card textures
 pub async fn load_card_textures() -> Vec<Texture2D> {
-    let card_paths = vec![
-        "assets/cards/jelly/Junior_Jelly.png",
-        "assets/cards/jelly/Sling_Jelly.png",
-        "assets/cards/mutation/Super.png",
-        "assets/cards/item/Nab_Net.png",
-        "assets/cards/creature/Kibble.png",
-        "assets/cards/creature/Taki.png",
-        // Add more card paths as needed
-    ];
+    let card_paths = include_dir!("./assets/cards/");
 
     let mut card_textures = Vec::new();
 
