@@ -124,3 +124,131 @@ pub enum GameState {
     Rules,
     ViewCards,
 }
+
+// For storing each card.
+struct Card {
+    // Stats
+    
+    effects_base: Vec<CardEffect>, // Base Effects
+    effects_modifier: Vec<Vec<CardEffect>> // Modifier Effects
+}
+
+struct CardStats {
+    health: u32, // The damage points this card can sustain.
+    damage: u32, // 
+    defense: u32
+}
+
+// So there's a big container for all effects on a card.
+// The big container is broken into individual phases with vectors for every effect.
+// Each phase has it's own iterator that is called when that phase occurs.
+// Card is played. It's effect container OnPlay is triggered. Each item is matched and if it is a positive match, then perform that function.
+// Effect order is resolve order.
+// Attacks happen before damages. Discard happens after damage resolves.
+
+struct EffectContainer {
+    on_draw: Vec<CardEffect>, // For when a card is drawn.
+    on_discard: Vec<CardEffect>, // For when a card is discarded.
+    on_bounce: Vec<CardEffect>, // For when a card is bounced back to its hand.
+
+    on_turn_start: Vec<CardEffect>, // For when a turn starts.
+    on_turn_end: Vec<CardEffect>, // For when a turn ends.
+
+    on_enter: Vec<CardEffect>, // For when a card is played (enters the field).
+    on_exit: Vec<CardEffect>, // For when a card leaves (exits the field).
+
+    on_attack: Vec<CardEffect>, // For when a card attacks.
+    on_damaged: Vec<CardEffect>, // For when a card is damaged.
+    
+    on_any: Vec<CardEffect>, // Occurs after each other game phase.
+}
+
+// Function for invoking the targetting prompt.
+// Function for invoking the selection menu prompt.
+// enum for selecting a stat.
+enum Selector {
+    Stat(SelectorStat),
+    Deck(SelectorDeck),
+}
+
+enum SelectorStat {
+    Random, // The selector is chosen randomly.
+    User, // The selector is chosen by the user.
+    Health,
+    Damage,
+    Defense
+}
+
+enum SelectorDeck {
+    Random, // The selector is chosen randomly.
+    User, // The selector is chosen by the user.
+    Jelly,
+    Creature,
+    Mutation,
+    Item
+}
+
+enum SelectorLocation {
+    Random, // The selector is chosen randomly.
+    User, // The selector is chosen by the user.
+    Deck(SelectorDeck),
+    Hand,
+    Field,
+    This
+}
+
+// For each effect a card could have.
+enum CardEffect {
+    // Creatures
+    //
+    OnAttackPreventAttackUntilDamaged, // Zor: This creature cannot attack until it takes damage.
+    OnAttackDeathtouch, // Oodalah: Nothing survives a hit from this card.
+    OnDamagedBounceFailedRolls, // Rock: Cards that fail an attack roll are sent back to their player's hand.
+    OnAnyConvertStat(SelectorStat, SelectorStat), // Rogue Jellies: Damage = Health
+    OnAttackReplaceWithFreshDraw(SelectorDeck), // Torble: Jellies hit by this card are discarded and replaced with a newly drawn Jelly. (This applies to all creatures.)
+    OnAttackStealCardFromDamaged, // Jammie: When this card lands an attack, take a card from that player's hand.
+    OnAttackStatlink(SelectorStat, u32), // Slime: Gain # stat every time this card lands an attack.
+    OnPlayGainMutationSlot(u32), // Jim: Big Potential. Attach up to # mutation cards to this card.
+    OnAttackModifyRoll(u32), // Kibble: +# from attack rolls made by this creature. (Kibble is silly)
+    OnPlayModifyThisStat(SelectorStat, u32), // Taki: Add # point to this card's stats when put into play.
+
+    // Items
+    //
+    OnPlayDiscard, // Catching item behavior.
+    OnPlayRestoreStat(SelectorStat, u32), // Goober Fruit: Restore 2 Health to any Jelly card or Creature card.
+    OnPlayStealCard(SelectorDeck), // Jelly Jabber: Steal a mutation from a Jelly or Creature.
+    OnPlayGrantEffect(Box<CardEffect>), // Jelly Jail: Place this card on a Jelly to restrict it from attacking until it takes damage.
+    // Angelly: When a Jelly would be discarded, restore all of its Health and keep it in play.
+    OnPlay, // Powder Jelly: Deal # damage to each card in play.
+    OnPlayGainStatus, // Sharp Stick: Place on a Jelly or Creature. That card gains double damage the next time it deals damage.
+    // Shield: When hit with an attack, play this card to take no damage.
+    // Onedesix: Play this card after any roll to re-roll it.
+    // Sticky Snatcher: Steal 1 item card from another player's hand.
+    // Nab Net: Play this card when a Jelly or Creature is discarded to add it to your hand.
+
+    // Jellies
+    //
+    OnDamagedIncreaseStatAtLow(SelectorStat, u32, u32), // Bruiser: +y Damage when at x Health
+    // Spicy: Hazardous: When you take daamge, deal 1 damage back.
+    // Shelly: Armored: All attacks against this card can only deal 1 damage.
+    // Flutter: Fast: When attacking with this card, boost the attack roll by 1.
+    // Jambler: Jamble: At the start of your turn, roll a dice to determine this card's health.
+    // Jumper: Warp: Landing an attack on a Jelly or Creature card sends them back to their player's hand.
+    // Gum: Mimic: Replace this card with the next card it reduces to 0 Health. (Discard the original card.)
+    // Chilli: Freeze: Jellies that hit you with an attack cannot attack on their next turn.
+    // Junior: Potential: Attach up to two mutation cards to this card.
+    // Sling: Sling: This jelly does not take damage caused by Hazardous.
+
+    // Mutations
+    //
+    // Pitiful Gaze: +1 Defense
+    // Strong: +1 Damage
+    // Tough: +1 Health
+    // Fast: When attacking with this card, boost the attack roll by 1.
+    // Sucker: Gain +1 Health for every point of damage dealt. Cannot go over health maximum.
+    // Armor: Armored: All attacks against this card can only deal 1 damage.
+    // Willpower: When this card would be discarded, it can remain in play until after your next turn. (Withdrawing before then saves this card.)
+    // Icebreaker: Immune to Freeze and Jelly Jail
+    // Hazardous: When you take damage, deal one damage back to the attacker.
+    // Super: When a Jelly on your team is discarded, gain +1 Attack and +1 Defense
+}
