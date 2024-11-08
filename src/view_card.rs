@@ -1,74 +1,73 @@
-use crate::GameState;
-use include_dir::include_dir;
 use macroquad::prelude::*;
+use crate::GameState;
 
-// Function to load card textures
-pub async fn load_card_textures() -> Vec<Texture2D> {
-    let card_paths = include_dir!("./assets/cards/");
+pub fn view_card_types(state: &mut GameState) {
+    // Clear the background
+    clear_background(Color::new(0.0, 0.4, 0.3, 1.0));
 
-    let mut card_textures = Vec::new();
+    // Draw the "Back" button
+    draw_rectangle(10.0, 10.0, 100.0, 50.0, RED);
+    draw_text("Back", 30.0, 40.0, 20.0, WHITE);
 
-    for directories in card_paths.dirs() {
-        for path in directories.files() {
-            if path.path().extension().unwrap().to_ascii_lowercase() == "png" {
-                let texture = Texture2D::from_file_with_format(path.contents(), None);
-                card_textures.push(texture);
+    // Grid layout configuration
+    let button_width = 350.0;
+    let button_height = 250.0;
+    let padding = 20.0;
+    
+    // Calculate grid position to center it on screen
+    let grid_width = (button_width * 2.0) + padding;
+    let grid_height = (button_height * 2.0) + padding;
+    let start_x = (screen_width() - grid_width) / 2.0;
+    let start_y = (screen_height() - grid_height) / 2.0;
+
+    // Define button positions and properties with new colors
+    let buttons = [
+        // Creatures - Blue
+        (start_x, start_y, "View Creature", GameState::ViewCreature, 
+        Color::new(1.0, 0.0, 0.0, 1.0)),
+        // Items - Yellow
+        (start_x + button_width + padding, start_y, "View Item", GameState::ViewItem, 
+         Color::new(1.0, 1.0, 0.0, 1.0)),
+        // Jellies - Teal
+        (start_x, start_y + button_height + padding, "View Jelly", GameState::ViewJelly, 
+         Color::new(0.0, 0.8, 0.8, 1.0)),
+        // Mutations - Red
+        (start_x + button_width + padding, start_y + button_height + padding, "View Mutation", GameState::ViewMutation, 
+         Color::new(0.0, 0.0, 1.0, 1.0))
+    ];
+
+    // Draw buttons and handle clicks
+    let mouse_pos = mouse_position();
+    
+    for (x, y, text, next_state, color) in buttons.iter() {
+        // Draw button
+        draw_rectangle(*x, *y, button_width, button_height, *color);
+        
+        // Center text in button
+        let text_size = 60.0;
+        let text_width = measure_text(text, None, text_size as u16, 1.0).width;
+        let text_x = x + (button_width - text_width) / 2.0;
+        let text_y = y + (button_height + text_size) / 2.0;
+        
+        // Button text color
+        let text_color = BLACK;
+        
+        draw_text(text, text_x, text_y, text_size, text_color);
+
+        // Handle click
+        if is_mouse_button_pressed(MouseButton::Left) {
+            if mouse_pos.0 >= *x && mouse_pos.0 <= x + button_width &&
+               mouse_pos.1 >= *y && mouse_pos.1 <= y + button_height {
+                *state = next_state.clone();
             }
         }
     }
 
-    card_textures
-}
-
-// Function to render the view cards screen
-pub fn draw_view_cards(card_textures: &[Texture2D], state: &mut GameState) {
-    // Clear the background for the View Cards screen
-    clear_background(BLACK);
-
-    // Grid layout settings
-    let cols = 3; // Number of columns
-    let spacing = 20.0; // Space between cards
-
-    // Calculate card dimensions based on screen size
-    let screen_width = screen_width();
-    let card_width = (screen_width - (spacing * (cols as f32 + 1.0))) / cols as f32; // Width of each card
-    let card_height = card_width * 1.5; // Maintain aspect ratio (1.5:1)
-
-    // Calculate starting position
-    let start_x = spacing; // Starting X position with spacing
-    let start_y = 100.0; // Starting Y position
-
-    // Draw each card in the grid
-    for (i, texture) in card_textures.iter().enumerate() {
-        let col = i % cols;
-        let row = i / cols;
-
-        let x = start_x + col as f32 * (card_width + spacing);
-        let y = start_y + row as f32 * (card_height + spacing);
-
-        // Draw the card texture
-        draw_texture_ex(
-            *texture,
-            x,
-            y,
-            WHITE,
-            DrawTextureParams {
-                dest_size: Some(Vec2::new(card_width, card_height)), // Scale card to the calculated dimensions
-                ..Default::default()
-            },
-        );
-    }
-
-    // Draw a simple "Back" button
-    draw_rectangle(10.0, 10.0, 100.0, 50.0, RED);
-    draw_text("Back", 30.0, 40.0, 20.0, WHITE);
-
-    // Handle the "Back" button to go back to the Rules state
+    // Handle back button click
     if is_mouse_button_pressed(MouseButton::Left) {
-        let mouse_x = mouse_position().0;
-        let mouse_y = mouse_position().1;
-        if mouse_x > 10.0 && mouse_x < 110.0 && mouse_y > 10.0 && mouse_y < 60.0 {
-            *state = GameState::Rules; // Switch back to Rules
+        if mouse_pos.0 > 10.0 && mouse_pos.0 < 110.0 && 
+           mouse_pos.1 > 10.0 && mouse_pos.1 < 60.0 {
+            *state = GameState::Menu;
         }
     }
 }
