@@ -4,11 +4,14 @@ mod view_creature;
 mod view_item;
 mod view_jelly;
 mod view_mutation;
+mod player_turn;
+use player_turn::TurnState;
 use macroquad::prelude::*;
 
 #[macroquad::main("Jelly Jam")]
 async fn main() {
     let mut state = GameState::Menu;
+    let mut turn_state = TurnState::Player1;
 
     // Load textures at the start
     let background_texture =
@@ -94,7 +97,11 @@ async fn main() {
                         {
                             match *label {
                                 "Single Play" => println!("Single Play button clicked!"),
-                                "Multi Play" => println!("Multi Play button clicked!"),
+                                "Multi Play" => {
+                                    println!("Multi Play button clicked!");
+                                    state = GameState::PlayerTurn; // Start main multiplayer loop
+                                    turn_state = TurnState::Player1;
+                                } 
                                 "Rules" => {
                                     println!("Rules button clicked!");
                                     state = GameState::Rules; // Switch to the Rules state
@@ -134,6 +141,17 @@ async fn main() {
                 // Draw the view cards screen with correct textures
                 view_mutation::draw_view_mutation(&mutation_textures, &mut state);
             }
+            GameState::PlayerTurn => {
+                // Handle the player turn state
+                turn_state = player_turn::player_turn_screen(turn_state).await;
+                
+                // After the turn screen is complete, switch to the next game state
+                // For now, we'll just alternate between players
+                turn_state = match turn_state {
+                    TurnState::Player1 => TurnState::Player2,
+                    TurnState::Player2 => TurnState::Player1,
+                };
+            }
         }
 
         // Synchronize the frame
@@ -150,4 +168,6 @@ pub enum GameState {
     ViewItem,
     ViewJelly,
     ViewMutation,
+    PlayerTurn,
+    
 }

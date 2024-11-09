@@ -5,4 +5,5 @@ edition = "2021"
 
 [dependencies]
 include_dir = "0.7.4"
-macroquad = "0.3.16"
+macroquad = { version = "0.3.23", default_features = false }
+rodio = "0.20.1"
