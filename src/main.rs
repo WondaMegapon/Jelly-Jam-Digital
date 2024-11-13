@@ -168,12 +168,82 @@ enum Phases {
 }
 
 fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
+    // For phase specific behavior.
     match current_phase {
+        Phases::OnDraw => match current_card {
+            _ => {
+                println!("Card {:?} has no OnDraw effect.", current_card.base_effects);
+            }
+        },
+        Phases::OnDiscard => match current_card {
+            _ => {
+                println!(
+                    "Card {:?} has no OnDiscard effect.",
+                    current_card.base_effects
+                );
+            }
+        },
+        Phases::OnBounce => match current_card {
+            _ => {
+                println!(
+                    "Card {:?} has no OnBounce effect.",
+                    current_card.base_effects
+                );
+            }
+        },
+        Phases::OnTurnStart => match current_card {
+            _ => {
+                println!(
+                    "Card {:?} has no OnTurnStart effect.",
+                    current_card.base_effects
+                );
+            }
+        },
+        Phases::OnTurnEnd => match current_card {
+            _ => {
+                println!(
+                    "Card {:?} has no OnTurnEnd effect.",
+                    current_card.base_effects
+                );
+            }
+        },
+        Phases::OnEnter => match current_card {
+            _ => {
+                println!(
+                    "Card {:?} has no OnEnter effect.",
+                    current_card.base_effects
+                );
+            }
+        },
+        Phases::OnExit => match current_card {
+            _ => {
+                println!("Card {:?} has no OnExit effect.", current_card.base_effects);
+            }
+        },
+        Phases::OnAttack => match current_card {
+            _ => {
+                println!(
+                    "Card {:?} has no OnAttack effect.",
+                    current_card.base_effects
+                );
+            }
+        },
+        Phases::OnDamaged => match current_card {
+            _ => {
+                println!(
+                    "Card {:?} has no OnDamaged effect.",
+                    current_card.base_effects
+                );
+            }
+        },
+        Phases::OnAny => match current_card {
+            _ => {}
+        },
+    }
+    // For any behavior.
+    match current_card {
         _ => {
-            panic!(
-                "Phase {:?} unimplemented! Fix this so {:?} can work!",
-                current_phase, current_card
-            );
+            println!("Card {:?} has no OnAny effect.", current_card.base_effects);
         }
     }
 }
