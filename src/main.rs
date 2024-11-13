@@ -1,12 +1,12 @@
+mod player_turn;
 mod rules;
 mod view_card;
 mod view_creature;
 mod view_item;
 mod view_jelly;
 mod view_mutation;
-mod player_turn;
-use player_turn::TurnState;
 use macroquad::prelude::*;
+use player_turn::TurnState;
 
 #[macroquad::main("Jelly Jam")]
 async fn main() {
@@ -101,7 +101,7 @@ async fn main() {
                                     println!("Multi Play button clicked!");
                                     state = GameState::PlayerTurn; // Start main multiplayer loop
                                     turn_state = TurnState::Player1;
-                                } 
+                                }
                                 "Rules" => {
                                     println!("Rules button clicked!");
                                     state = GameState::Rules; // Switch to the Rules state
@@ -144,7 +144,7 @@ async fn main() {
             GameState::PlayerTurn => {
                 // Handle the player turn state
                 turn_state = player_turn::player_turn_screen(turn_state).await;
-                
+
                 // After the turn screen is complete, switch to the next game state
                 // For now, we'll just alternate between players
                 turn_state = match turn_state {
@@ -169,6 +169,14 @@ pub enum GameState {
     ViewJelly,
     ViewMutation,
     PlayerTurn,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Deck {
+    Jelly,
+    Creature,
+    Mutation,
+    Item,
 }
 
 // For storing each card.
