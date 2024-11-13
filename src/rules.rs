@@ -1,5 +1,5 @@
 use macroquad::prelude::*;
-use crate::GameState; // Import GameState from main.rs
+use crate::GameState;
 
 // Function to render the rules screen
 pub fn draw_rules(rules_texture: &Texture2D, state: &mut GameState) {
@@ -50,4 +50,3 @@ pub fn draw_rules(rules_texture: &Texture2D, state: &mut GameState) {
         }
     }
 }
-

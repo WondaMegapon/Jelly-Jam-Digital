@@ -1,10 +1,17 @@
 mod rules;
 mod view_card;
+mod view_creature;
+mod view_item;
+mod view_jelly;
+mod view_mutation;
+mod player_turn;
+use player_turn::TurnState;
 use macroquad::prelude::*;
 
 #[macroquad::main("Jelly Jam")]
 async fn main() {
     let mut state = GameState::Menu;
+    let mut turn_state = TurnState::Player1;
 
     // Load textures at the start
     let background_texture =
@@ -13,8 +20,11 @@ async fn main() {
     let rules_texture =
         Texture2D::from_file_with_format(include_bytes!("../assets/rules/rules.png"), None);
 
-    // Load card textures using the view_card module
-    let card_textures = view_card::load_card_textures().await;
+    // Load card textures using the view_cards modules - fixed with unique variables
+    let creature_textures = view_creature::load_card_creature().await;
+    let item_textures = view_item::load_card_item().await;
+    let jelly_textures = view_jelly::load_card_jelly().await;
+    let mutation_textures = view_mutation::load_card_mutation().await;
 
     // Main game loop
     loop {
@@ -87,7 +97,11 @@ async fn main() {
                         {
                             match *label {
                                 "Single Play" => println!("Single Play button clicked!"),
-                                "Multi Play" => println!("Multi Play button clicked!"),
+                                "Multi Play" => {
+                                    println!("Multi Play button clicked!");
+                                    state = GameState::PlayerTurn; // Start main multiplayer loop
+                                    turn_state = TurnState::Player1;
+                                } 
                                 "Rules" => {
                                     println!("Rules button clicked!");
                                     state = GameState::Rules; // Switch to the Rules state
@@ -108,8 +122,35 @@ async fn main() {
                 rules::draw_rules(&rules_texture, &mut state);
             }
             GameState::ViewCards => {
-                // Draw the view cards screen
-                view_card::draw_view_cards(&card_textures, &mut state);
+                // Draw the buttons to view card types
+                view_card::view_card_types(&mut state);
+            }
+            GameState::ViewCreature => {
+                // Draw the view cards screen with correct textures
+                view_creature::draw_view_creature(&creature_textures, &mut state);
+            }
+            GameState::ViewItem => {
+                // Draw the view cards screen with correct textures
+                view_item::draw_view_item(&item_textures, &mut state);
+            }
+            GameState::ViewJelly => {
+                // Draw the view cards screen with correct textures
+                view_jelly::draw_view_jelly(&jelly_textures, &mut state);
+            }
+            GameState::ViewMutation => {
+                // Draw the view cards screen with correct textures
+                view_mutation::draw_view_mutation(&mutation_textures, &mut state);
+            }
+            GameState::PlayerTurn => {
+                // Handle the player turn state
+                turn_state = player_turn::player_turn_screen(turn_state).await;
+                
+                // After the turn screen is complete, switch to the next game state
+                // For now, we'll just alternate between players
+                turn_state = match turn_state {
+                    TurnState::Player1 => TurnState::Player2,
+                    TurnState::Player2 => TurnState::Player1,
+                };
             }
         }
 
@@ -123,14 +164,11 @@ pub enum GameState {
     Menu,
     Rules,
     ViewCards,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Deck {
-    Jelly,
-    Creature,
-    Mutation,
-    Item,
+    ViewCreature,
+    ViewItem,
+    ViewJelly,
+    ViewMutation,
+    PlayerTurn,
 }
 
 // For storing each card.
