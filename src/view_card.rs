@@ -1,5 +1,5 @@
-use macroquad::prelude::*;
 use crate::GameState;
+use macroquad::prelude::*;
 
 pub fn view_card_types(state: &mut GameState) {
     // Clear the background
