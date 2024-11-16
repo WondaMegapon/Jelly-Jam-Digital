@@ -1,3 +1,5 @@
+use std::ops::{DerefMut, Index, Sub, SubAssign};
+
 use macroquad::rand::ChooseRandom;
 
 #[derive(Debug)]
@@ -18,11 +20,13 @@ pub struct GameData {
     // Handling player data.
     pub player_hands: Vec<Vec<Card>>, // This'll store all of the hands of each player.
     pub player_fields: Vec<Vec<Card>>, // This'll store the battlefields of each player.
+    pub player_placement: Vec<usize>, // This is tracking the placements for each round.
     pub player_victories: Vec<u8>,    // And this'll be for tracking wins.
 
     // And for individual turn states.
     pub player_count: u8,
     pub current_player: u8,
+    pub current_round: u16,
     pub victory_threshold: u8,
 }
 
@@ -45,7 +49,7 @@ impl GameData {
                 ],
                 deck_creature: vec![
                     Card::new_creature(CardName::Zor, 3, 2, 3),
-                    Card::new_creature(CardName::Oodalah, 1, 255, 3),
+                    Card::new_creature(CardName::Oodalah, 1, i8::MAX, 3),
                     Card::new_creature(CardName::Rock, 4, 0, 2),
                     Card::new_creature(CardName::RogueJellies, 3, 3, 2),
                     Card::new_creature(CardName::Torble, 1, 0, 4),
@@ -84,9 +88,11 @@ impl GameData {
                 deck_prize_pool: Vec::new(),
                 player_hands: vec![Vec::new(); player_count.into()],
                 player_fields: vec![Vec::new(); player_count.into()],
+                player_placement: Vec::new(),
                 player_victories: vec![0; player_count.into()],
                 player_count: player_count,
-                current_player: 0,
+                current_player: player_count - 1,
+                current_round: 0,
                 victory_threshold: victory_threshold,
             })
         } else {
@@ -96,17 +102,44 @@ impl GameData {
 
     // HELPER FUNCTIONS
     //
-    fn move_card(source: &mut Vec<Card>, destination: &mut Vec<Card>) {
+    fn move_card(source: Card, destination: &mut Vec<Card>) {
+        destination.push(source); // Yeah just move it over.
+    }
+
+    fn draw_card(source: &mut Vec<Card>, destination: &mut Vec<Card>) {
         if source.len() > 0 {
-            destination.push(source.pop().unwrap()); // Move it out of one and into the other.
+            let fresh_card = &mut source.pop().unwrap();
+            fresh_card.current_health = fresh_card.base_health;
+            fresh_card.current_damage = fresh_card.base_damage;
+            fresh_card.current_defense = fresh_card.base_defense;
+            destination.push(fresh_card.clone()); // Move it out of one and into the other.
         } else {
             println!("No cards left in source!"); // Scream and cry.
         }
     }
 
-    fn select_card(source: &mut Vec<Card>) -> Card {
+    fn select_card(source: &mut Vec<Card>, filter: impl Fn(&&Card) -> bool) -> Option<Card> {
         // Just random number generation for now.
-        source.swap_remove((macroquad::rand::rand() as usize) % source.len())
+        let filtered_selection = source.iter().filter(filter).cloned().collect::<Vec<Card>>();
+        if filtered_selection.len() > 0 {
+            let selection =
+                &filtered_selection[(macroquad::rand::rand() as usize) % filtered_selection.len()];
+            println!("Selected {:?}.", selection);
+            Some(source.swap_remove(source.iter().position(|card| card == selection).unwrap()))
+        } else {
+            None
+        }
+    }
+
+    fn select_hand(source: &Vec<Vec<Card>>, filter: impl Fn(usize) -> bool) -> usize {
+        // Just random number generation for now.
+        loop {
+            let selection = (macroquad::rand::rand() as usize) % source.len();
+            println!("Selected {:?}.", selection);
+            if (filter(selection)) {
+                return selection;
+            }
+        }
     }
 
     // FOR THE GAME LOOP ITSELF
@@ -121,58 +154,248 @@ impl GameData {
         // Giving each player their starting hand.
         for (index, player) in self.player_hands.iter_mut().enumerate() {
             println!("Drawing starting hand for Player {}", index);
-            GameData::move_card(&mut self.deck_jelly, player);
-            GameData::move_card(&mut self.deck_jelly, player);
-            GameData::move_card(&mut self.deck_creature, player);
-            GameData::move_card(&mut self.deck_mutation, player);
-            GameData::move_card(&mut self.deck_item, player);
+            GameData::draw_card(&mut self.deck_jelly, player);
+            GameData::draw_card(&mut self.deck_jelly, player);
+            GameData::draw_card(&mut self.deck_creature, player);
+            GameData::draw_card(&mut self.deck_mutation, player);
+            GameData::draw_card(&mut self.deck_item, player);
             println!("Current hand is {:?}.", player);
         }
 
         // Moving all of the special cards over to the loot deck.
+        println!("Moving everything to the loot pile...");
         self.deck_loot.append(&mut self.deck_creature);
         self.deck_loot.append(&mut self.deck_mutation);
         self.deck_loot.append(&mut self.deck_item);
         self.deck_loot.shuffle();
 
         // Moving our loot deck to the prize pool.
+        println!("Here are the prize cards.");
         for _iterator in 0..(self.player_count - 1) {
-            GameData::move_card(&mut self.deck_loot, &mut self.deck_prize_pool);
+            GameData::draw_card(&mut self.deck_loot, &mut self.deck_prize_pool);
             println!(
                 "A {:?} is in the prize pool!",
                 &self.deck_prize_pool.last().unwrap()
             );
         }
 
-        // The big kahuna.
-        // 'game: loop {
-        //     // For each round.
-        //     'round: loop {
-        //         'turn: for player in 0..self.player_count {}
-        //     }
-        // }
+        // For each round.
+        println!("Now let's get the game started.");
+        'round: loop {
+            // Pre-round.
+            println!("Starting Round {:?}.", self.current_round + 1);
+            // Everybody plays two living cards.
+            for player in 0..self.player_count {
+                println!("Player {}, play two cards.", player);
+                for _iterator in 0..2 {
+                    let selected_card =
+                        GameData::select_card(&mut self.player_hands[player as usize], |card| {
+                            card.color == CardColor::Jelly || card.color == CardColor::Creature
+                        });
+                    if selected_card.is_some() {
+                        GameData::move_card(
+                            selected_card.unwrap(),
+                            &mut self.player_fields[player as usize],
+                        );
+                    } else {
+                        println!("...No cards to play?");
+                    }
+                }
+            }
+
+            // Now for the primary game loop.
+            'turn: loop {
+                // Start turn.
+                println!("Starting Player {}'s turn!", self.current_player);
+                // Reading out the current board state.
+                println!("Here's the current battlefield. {:?}", self.player_fields);
+                // And quietly performing the board check.
+                if self
+                    .player_fields
+                    .iter()
+                    .filter(|field| field.len() > 0)
+                    .count()
+                    <= 1
+                {
+                    // Moving the last card over.
+                    let last_card = self.player_fields[self.current_player as usize].pop();
+                    if last_card.is_some() {
+                        GameData::move_card(
+                            last_card.unwrap(),
+                            &mut self.player_hands[self.current_player as usize],
+                        );
+                    }
+                    break 'turn;
+                }
+                println!(
+                    "And your hand. {:?}",
+                    self.player_hands[self.current_player as usize]
+                );
+
+                // Middle turn.
+                if self.player_hands[self.current_player as usize].len() > 0 {
+                    // Handling items. (NOT MUTATIONS!)
+                    // Handling combat.
+                    {
+                        println!("Select attackers.");
+                        let attacker = GameData::select_card(
+                            &mut self.player_fields[self.current_player as usize],
+                            |card| card.current_damage.is_some_and(|x| x > 0),
+                        );
+                        if attacker.as_ref().is_some() {
+                            println!("Select who you're attacking.");
+                            let target_field = GameData::select_hand(&self.player_fields, |hand| {
+                                hand != self.current_player as usize
+                                    && self.player_fields[hand].len() > 0
+                            });
+                            println!("Select which card you're attacking.");
+                            let defender = &mut GameData::select_card(
+                                &mut self.player_fields[target_field],
+                                |card| card.current_health.is_some(),
+                            );
+                            let roll = (macroquad::rand::rand() % 6 + 1) as i8;
+                            if roll >= defender.as_ref().unwrap().current_defense.unwrap() {
+                                println!("{}! Successful roll!", roll);
+                                defender
+                                    .as_mut()
+                                    .unwrap()
+                                    .current_health
+                                    .as_mut()
+                                    .unwrap()
+                                    .sub_assign(attacker.as_ref().unwrap().current_damage.unwrap());
+                                if defender
+                                    .as_ref()
+                                    .unwrap()
+                                    .current_health
+                                    .is_some_and(|x| x <= 0)
+                                {
+                                    // Discard.
+                                    println!("{:?} defeated...", defender.as_ref().unwrap());
+
+                                    // Special cases for jellies.
+                                    if defender.as_ref().unwrap().color == CardColor::Jelly {
+                                        self.deck_jelly.push(defender.clone().unwrap());
+                                        self.deck_jelly.shuffle();
+                                    } else {
+                                        self.deck_loot.push(defender.clone().unwrap());
+                                        self.deck_loot.shuffle();
+                                    }
+
+                                    // Handling placement if that was their last card.
+                                    if self.player_fields[target_field].len() <= 0 {
+                                        println!("Player {} has been knocked out.", target_field);
+                                        self.player_placement.push(target_field);
+                                    }
+                                } else {
+                                    // Return to field.
+                                    self.player_fields[target_field]
+                                        .push(defender.clone().unwrap());
+                                }
+                            } else {
+                                println!("{}. Failed roll.", roll);
+                                self.player_fields[target_field].push(defender.clone().unwrap());
+                            }
+                            // Putting the card back.
+                            self.player_fields[self.current_player as usize]
+                                .push(attacker.unwrap());
+                        } else {
+                            println!("No valid attackers.");
+                        }
+                    }
+                // Handling withdrawing.
+                } else {
+                    println!(
+                        "Player {} has no cards on their field, so we're skipping their turn.",
+                        self.current_player
+                    )
+                }
+
+                // End turn.
+                // Discard down to eight.
+                while self.player_hands[self.current_player as usize].len() > 8 {
+                    println!("Please discard down to eight cards.");
+                    let selected_card = GameData::select_card(
+                        &mut self.player_hands[self.current_player as usize],
+                        |_iterator| true,
+                    );
+                    if selected_card.as_ref().unwrap().color == CardColor::Jelly {
+                        self.deck_jelly.push(selected_card.unwrap());
+                        self.deck_jelly.shuffle();
+                    } else {
+                        self.deck_loot.push(selected_card.unwrap());
+                        self.deck_loot.shuffle();
+                    }
+                }
+                self.current_player = (self.current_player + 1) % (self.player_hands.len() as u8);
+            }
+            // Post-round
+            self.player_placement.reverse(); // Reversing the placement.
+            println!("Round end. Player {} won!", self.player_placement[0]);
+            self.player_victories[self.player_placement[0]] += 1; // Incrementing score.
+
+            // Handling prizes.
+            println!("The placements are {:?}", self.player_placement);
+            for iterator in 0..(self.player_placement.len() - 1) {
+                println!("Player {}, please pick a prize card.", iterator);
+                GameData::move_card(
+                    GameData::select_card(&mut self.deck_prize_pool, |_x| true).unwrap(),
+                    &mut self.player_hands[iterator],
+                );
+            }
+            self.player_placement.clear(); // Clearing the placement.
+
+            // Moving our loot deck to the prize pool.
+            println!("Here are the prize cards.");
+            for _iterator in 0..(self.player_count - 1) {
+                GameData::draw_card(&mut self.deck_loot, &mut self.deck_prize_pool);
+                println!(
+                    "A {:?} is in the prize pool!",
+                    &self.deck_prize_pool.last().unwrap()
+                );
+            }
+
+            // Drawing new Jellies.
+            for (index, player) in self.player_hands.iter_mut().enumerate() {
+                println!("Drawing new jellies for Player {}", index);
+                GameData::draw_card(&mut self.deck_jelly, player);
+                if !player.iter().any(|card| card.color == CardColor::Jelly) {
+                    println!("And an extra...");
+                    GameData::draw_card(&mut self.deck_jelly, player);
+                }
+                println!("Current hand is {:?}.", player);
+            }
+
+            // Incrementing our Round counter.
+            self.current_round += 1;
+            if self.current_round == 3 {
+                break 'round;
+            }
+        }
     }
 }
 
 // For storing each card.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 struct Card {
     // Stats
     color: CardColor,
-    health: Option<u8>,          // The health (optional.)
-    damage: Option<u8>,          // The damage (optional.)
-    defense: Option<u8>,         // The defense (optional.)
+    base_health: Option<i8>,     // The health (optional.)
+    base_damage: Option<i8>,     // The damage (optional.)
+    base_defense: Option<i8>,    // The defense (optional.)
+    current_health: Option<i8>,  // The health (optional.)
+    current_damage: Option<i8>,  // The damage (optional.)
+    current_defense: Option<i8>, // The defense (optional.)
     base_effects: CardName,      // The card's base effects.
     modifier_slots: u8,          // The amount of modifier slots.
     modifier_effects: Vec<Card>, // The card's modified effects.
 }
 
 impl Card {
-    fn new_jelly(card_name: CardName, health: u8, damage: u8, defense: u8) -> Card {
+    fn new_jelly(card_name: CardName, health: i8, damage: i8, defense: i8) -> Card {
         Card::new_living(card_name, health, damage, defense, CardColor::Jelly)
     }
 
-    fn new_creature(card_name: CardName, health: u8, damage: u8, defense: u8) -> Card {
+    fn new_creature(card_name: CardName, health: i8, damage: i8, defense: i8) -> Card {
         Card::new_living(card_name, health, damage, defense, CardColor::Creature)
     }
 
@@ -187,9 +410,12 @@ impl Card {
     fn new_usable(card_name: CardName, color: CardColor) -> Card {
         Card {
             color: color,
-            health: None,
-            damage: None,
-            defense: None,
+            base_health: None,
+            base_damage: None,
+            base_defense: None,
+            current_health: None,
+            current_damage: None,
+            current_defense: None,
             base_effects: card_name,
             modifier_slots: 0,
             modifier_effects: Vec::new(),
@@ -198,16 +424,19 @@ impl Card {
 
     fn new_living(
         card_name: CardName,
-        health: u8,
-        damage: u8,
-        defense: u8,
+        health: i8,
+        damage: i8,
+        defense: i8,
         color: CardColor,
     ) -> Card {
         Card {
             color: color,
-            health: Some(health),
-            damage: Some(damage),
-            defense: Some(defense),
+            base_health: Some(health),
+            base_damage: Some(damage),
+            base_defense: Some(defense),
+            current_health: Some(health),
+            current_damage: Some(damage),
+            current_defense: Some(defense),
             base_effects: card_name,
             modifier_slots: 1,
             modifier_effects: Vec::new(),
@@ -227,12 +456,12 @@ impl std::fmt::Debug for Card {
                 CardColor::Item => "\x1b[0;33m",
             },
             self.base_effects,
-            if self.health.is_some() {
+            if self.current_health.is_some() {
                 format!(
                     ", {:?}/{:?}/{:?}",
-                    self.health.unwrap_or(0),
-                    self.damage.unwrap_or(0),
-                    self.defense.unwrap_or(0)
+                    self.current_health.unwrap_or(0),
+                    self.current_damage.unwrap_or(0),
+                    self.current_defense.unwrap_or(0)
                 )
             } else {
                 "".to_string()
@@ -247,7 +476,7 @@ impl std::fmt::Debug for Card {
 }
 
 // For keeping track of decked data.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CardColor {
     Jelly,
     Creature,
@@ -367,7 +596,7 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
 }
 
 // For each effect a card could have.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CardName {
     // Creatures
     //
