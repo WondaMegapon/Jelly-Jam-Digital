@@ -200,7 +200,7 @@ async fn run() -> Result<()> {
             }
             GameState::InGame => {
                 macroquad::rand::srand(get_time() as u64);
-                let mut new_game = game_instance::GameData::new(4, 3).unwrap();
+                let mut new_game = game_instance::GameData::new(4, 3).await.unwrap();
                 new_game.run().await;
                 state = GameState::Menu;
             }

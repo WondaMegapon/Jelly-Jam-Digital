@@ -1,7 +1,9 @@
 use std::ops::SubAssign;
 
+use macroquad::prelude::*;
 use macroquad::{
     rand::ChooseRandom,
+    texture::{draw_texture_ex, load_texture},
     window::{clear_background, next_frame},
 };
 
@@ -26,6 +28,8 @@ pub struct GameData {
     pub player_placement: Vec<usize>, // This is tracking the placements for each round.
     pub player_victories: Vec<u8>,    // And this'll be for tracking wins.
 
+    pub texture_dictionary: Vec<Texture2D>, // For storing all of the textures.
+
     // And for individual turn states.
     pub player_count: u8,
     pub current_player: u8,
@@ -35,64 +39,96 @@ pub struct GameData {
 
 impl GameData {
     // For creating a new gamedata instance.
-    pub fn new(player_count: u8, victory_threshold: u8) -> Option<GameData> {
+    pub async fn new(player_count: u8, victory_threshold: u8) -> Option<GameData> {
         if player_count > 1 {
+            log::info!("Initalizing cards...");
+            let deck_jelly = vec![
+                Card::new_jelly(CardName::Bruiser, 2, 2, 3),
+                Card::new_jelly(CardName::Spicy, 2, 2, 3),
+                Card::new_jelly(CardName::Shelly, 2, 1, 2),
+                Card::new_jelly(CardName::Flutter, 1, 1, 4),
+                Card::new_jelly(CardName::Jambler, 6, 1, 2),
+                Card::new_jelly(CardName::Jumper, 1, 0, 4),
+                Card::new_jelly(CardName::Gum, 3, 1, 2),
+                Card::new_jelly(CardName::Chilli, 2, 1, 3),
+                Card::new_jelly(CardName::Junior, 2, 1, 3),
+                Card::new_jelly(CardName::Sling, 2, 1, 4),
+            ];
+            let deck_creature = vec![
+                Card::new_creature(CardName::Zor, 3, 2, 3),
+                Card::new_creature(CardName::Oodalah, 1, i8::MAX, 3),
+                Card::new_creature(CardName::Rock, 4, 0, 2),
+                Card::new_creature(CardName::RogueJellies, 3, 3, 2),
+                Card::new_creature(CardName::Torble, 1, 0, 4),
+                Card::new_creature(CardName::Jammie, 1, 1, 4),
+                Card::new_creature(CardName::Slime, 3, 1, 1),
+                Card::new_creature(CardName::Jim, 3, 1, 3),
+                Card::new_creature(CardName::Kibble, 2, 2, 4),
+                Card::new_creature(CardName::Taki, 3, 1, 3),
+                Card::new_creature(CardName::Paolarm, 3, 3, 3),
+            ];
+            let deck_mutation = vec![
+                Card::new_mutation(CardName::PitifulGaze),
+                Card::new_mutation(CardName::Strong),
+                Card::new_mutation(CardName::Tough),
+                Card::new_mutation(CardName::Fast),
+                Card::new_mutation(CardName::Sucker),
+                Card::new_mutation(CardName::Armor),
+                Card::new_mutation(CardName::Willpower),
+                Card::new_mutation(CardName::Icebreaker),
+                Card::new_mutation(CardName::Hazardous),
+                Card::new_mutation(CardName::Super),
+            ];
+            let deck_item = vec![
+                Card::new_item(CardName::GooberFruit),
+                Card::new_item(CardName::JellyJabber),
+                Card::new_item(CardName::JellyJail),
+                Card::new_item(CardName::Angelly),
+                Card::new_item(CardName::PowderJelly),
+                Card::new_item(CardName::SharpStick),
+                Card::new_item(CardName::Shield),
+                Card::new_item(CardName::Onedeesix),
+                Card::new_item(CardName::StickySnatcher),
+                Card::new_item(CardName::NabNet),
+            ];
+            // Loading card textures.
+            log::info!("Loading textures...");
+            let mut card_textures = vec![
+                Texture2D::empty();
+                &deck_jelly.len()
+                    + &deck_creature.len()
+                    + &deck_mutation.len()
+                    + &deck_item.len()
+            ];
+            for card in &deck_jelly {
+                card_textures[card.base_effects as usize] = card.load_texture().await;
+            }
+            log::info!("Loaded {} jellies...", &deck_jelly.len());
+            for card in &deck_creature {
+                card_textures[card.base_effects as usize] = card.load_texture().await;
+            }
+            log::info!("Loaded {} creatures...", &deck_creature.len());
+            for card in &deck_mutation {
+                card_textures[card.base_effects as usize] = card.load_texture().await;
+            }
+            log::info!("Loaded {} mutations...", &deck_mutation.len());
+            for card in &deck_item {
+                card_textures[card.base_effects as usize] = card.load_texture().await;
+            }
+            log::info!("Loaded {} items...", &deck_item.len());
+            log::info!("Done loading!");
             Some(GameData {
-                deck_jelly: vec![
-                    Card::new_jelly(CardName::Brusier, 2, 2, 3),
-                    Card::new_jelly(CardName::Spicy, 2, 2, 3),
-                    Card::new_jelly(CardName::Shelly, 2, 1, 2),
-                    Card::new_jelly(CardName::Flutter, 1, 1, 4),
-                    Card::new_jelly(CardName::Jambler, 6, 1, 2),
-                    Card::new_jelly(CardName::Jumper, 1, 0, 4),
-                    Card::new_jelly(CardName::Gum, 3, 1, 2),
-                    Card::new_jelly(CardName::Chilli, 2, 1, 3),
-                    Card::new_jelly(CardName::Junior, 2, 1, 3),
-                    Card::new_jelly(CardName::Sling, 2, 1, 4),
-                ],
-                deck_creature: vec![
-                    Card::new_creature(CardName::Zor, 3, 2, 3),
-                    Card::new_creature(CardName::Oodalah, 1, i8::MAX, 3),
-                    Card::new_creature(CardName::Rock, 4, 0, 2),
-                    Card::new_creature(CardName::RogueJellies, 3, 3, 2),
-                    Card::new_creature(CardName::Torble, 1, 0, 4),
-                    Card::new_creature(CardName::Jammie, 1, 1, 4),
-                    Card::new_creature(CardName::Slime, 3, 1, 1),
-                    Card::new_creature(CardName::Jim, 3, 1, 3),
-                    Card::new_creature(CardName::Kibble, 2, 2, 4),
-                    Card::new_creature(CardName::Taki, 3, 1, 3),
-                    Card::new_creature(CardName::Paolarm, 3, 3, 3),
-                ],
-                deck_mutation: vec![
-                    Card::new_mutation(CardName::PitifulGaze),
-                    Card::new_mutation(CardName::Strong),
-                    Card::new_mutation(CardName::Tough),
-                    Card::new_mutation(CardName::Fast),
-                    Card::new_mutation(CardName::Sucker),
-                    Card::new_mutation(CardName::Armor),
-                    Card::new_mutation(CardName::Willpower),
-                    Card::new_mutation(CardName::Icebreaker),
-                    Card::new_mutation(CardName::Hazardous),
-                    Card::new_mutation(CardName::Super),
-                ],
-                deck_item: vec![
-                    Card::new_item(CardName::GooberFruit),
-                    Card::new_item(CardName::JellyJabber),
-                    Card::new_item(CardName::JellyJail),
-                    Card::new_item(CardName::Angelly),
-                    Card::new_item(CardName::PowderJelly),
-                    Card::new_item(CardName::SharpStick),
-                    Card::new_item(CardName::Shield),
-                    Card::new_item(CardName::Onedesix),
-                    Card::new_item(CardName::StickySnatcher),
-                    Card::new_item(CardName::NabNet),
-                ],
+                deck_jelly: deck_jelly,
+                deck_creature: deck_creature,
+                deck_mutation: deck_mutation,
+                deck_item: deck_item,
                 deck_loot: Vec::new(),
                 deck_prize_pool: Vec::new(),
                 player_hands: vec![Vec::new(); player_count.into()],
                 player_fields: vec![Vec::new(); player_count.into()],
                 player_placement: Vec::new(),
                 player_victories: vec![0; player_count.into()],
+                texture_dictionary: card_textures,
                 player_count: player_count,
                 current_player: player_count - 1,
                 current_round: 0,
@@ -401,18 +437,21 @@ impl GameData {
                     self.player_placement.push(self.current_player as usize);
 
                     // Moving the last card over.
-                    let mut last_card = self.player_fields[self.current_player as usize].pop();
-                    if last_card.is_some() {
-                        log::info!("Moving {:?} back to hand.", last_card.as_ref().unwrap());
-                        while last_card.as_mut().unwrap().modifier_effects.len() > 0 {
-                            self.deck_loot
-                                .push(last_card.as_mut().unwrap().modifier_effects.pop().unwrap());
-                            self.deck_loot.shuffle();
+                    while self.player_fields[self.current_player as usize].len() > 0 {
+                        let mut last_card = self.player_fields[self.current_player as usize].pop();
+                        if last_card.is_some() {
+                            log::info!("Moving {:?} back to hand.", last_card.as_ref().unwrap());
+                            while last_card.as_mut().unwrap().modifier_effects.len() > 0 {
+                                GameData::move_card(
+                                    last_card.as_mut().unwrap().modifier_effects.pop().unwrap(),
+                                    &mut self.player_hands[self.current_player as usize],
+                                );
+                            }
+                            GameData::move_card(
+                                last_card.unwrap(),
+                                &mut self.player_hands[self.current_player as usize],
+                            );
                         }
-                        GameData::move_card(
-                            last_card.unwrap(),
-                            &mut self.player_hands[self.current_player as usize],
-                        );
                     }
                     break 'turn;
                 }
@@ -485,6 +524,35 @@ impl GameData {
         // Time to draw everything.
         //
 
+        // Drawing each field.
+        for field in 0..(self.player_fields.len()) {
+            for (card_index, card) in self.player_fields[field].iter().enumerate() {
+                Card::draw(
+                    self.texture_dictionary[card.base_effects as usize],
+                    card_index as f32 * 100.0 + 10.0,
+                    field as f32 * 145.0 + 10.0,
+                    90.0,
+                )
+                .await;
+            }
+        }
+
+        // And the hand.
+        for (card_index, card) in self.player_hands[self.current_player as usize]
+            .iter()
+            .enumerate()
+        {
+            Card::draw(
+                self.texture_dictionary[card.base_effects as usize],
+                500.0,
+                card_index as f32 * 160.0 + 10.0,
+                100.0,
+            )
+            .await;
+        }
+
+        ::std::thread::sleep(std::time::Duration::new(0, 200000000));
+
         next_frame().await; // Drawing that next frame.
     }
 }
@@ -506,6 +574,28 @@ struct Card {
 }
 
 impl Card {
+    pub async fn load_texture(&self) -> Texture2D {
+        load_texture(&format!(
+            "./assets/cards/{:?}/{:?}.png",
+            self.color, self.base_effects
+        ))
+        .await
+        .unwrap()
+    }
+
+    pub async fn draw(texture: Texture2D, x: f32, y: f32, size: f32) {
+        draw_texture_ex(
+            texture,
+            x,
+            y,
+            macroquad::color::WHITE,
+            macroquad::texture::DrawTextureParams {
+                dest_size: Some(Vec2::new(size, size * 1.5)),
+                ..Default::default()
+            },
+        );
+    }
+
     fn new_jelly(card_name: CardName, health: i8, damage: i8, defense: i8) -> Card {
         Card::new_living(card_name, health, damage, defense, CardColor::Jelly)
     }
@@ -736,13 +826,13 @@ enum CardName {
     PowderJelly, // Powder Jelly: Deal # damage to each card in play.
     SharpStick, // Sharp Stick: Place on a Jelly or Creature. That card gains double damage the next time it deals damage.
     Shield,     // Shield: When hit with an attack, play this card to take no damage.
-    Onedesix,   // Onedesix: Play this card after any roll to re-roll it.
+    Onedeesix,  // Onedeesix: Play this card after any roll to re-roll it.
     StickySnatcher, // Sticky Snatcher: Steal 1 item card from another player's hand.
     NabNet, // Nab Net: Play this card when a Jelly or Creature is discarded to add it to your hand.
 
     // Jellies
     //
-    Brusier, // Bruiser: +y Damage when at x Health
+    Bruiser, // Bruiser: +y Damage when at x Health
     Spicy,   // Spicy: Hazardous: When you take daamge, deal 1 damage back.
     Shelly,  // Shelly: Armored: All attacks against this card can only deal # damage.
     Flutter, // Flutter: Fast: When attacking with this card, boost the attack roll by #.
