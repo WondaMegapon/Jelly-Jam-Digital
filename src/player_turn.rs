@@ -18,7 +18,8 @@ pub struct PlayerTurnAudio {
 
 impl PlayerTurnAudio {
     pub fn new() -> Self {
-        let (_stream, stream_handle) = OutputStream::try_default().expect("Failed to initialize audio stream");
+        let (_stream, stream_handle) =
+            OutputStream::try_default().expect("Failed to initialize audio stream");
         let sink = Sink::try_new(&stream_handle).expect("Failed to create sink");
 
         // Include the audio file directly in the binary
@@ -98,7 +99,10 @@ pub async fn player_turn_screen(turn: TurnState) -> TurnState {
         );
 
         // If any key is pressed, proceed to main gameplay loop
-        if is_key_pressed(KeyCode::Space) || is_key_pressed(KeyCode::Enter) || is_key_pressed(KeyCode::A) {
+        if is_key_pressed(KeyCode::Space)
+            || is_key_pressed(KeyCode::Enter)
+            || is_key_pressed(KeyCode::A)
+        {
             audio.stop(); // Stop the music
             return turn;
         }
