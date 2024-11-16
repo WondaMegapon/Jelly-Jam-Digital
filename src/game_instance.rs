@@ -118,12 +118,18 @@ impl GameData {
         }
     }
 
+    // TODO!!!
+    // These two selection functions are where you can put a draw call/render call in.
     fn select_card(source: &mut Vec<Card>, filter: impl Fn(&&Card) -> bool) -> Option<Card> {
-        // Just random number generation for now.
+        //
+        // Up here call some sort of `fn Draw` function, then have it hover here until a player makes a selection, then let it keep running.
+        // All you should really have to do is draw the current card selection and then click it.
+        // Sorry, very sleepy right now.
+        //
         let filtered_selection = source.iter().filter(filter).cloned().collect::<Vec<Card>>();
         if filtered_selection.len() > 0 {
             let selection =
-                &filtered_selection[(macroquad::rand::rand() as usize) % filtered_selection.len()];
+                &filtered_selection[(macroquad::rand::rand() as usize) % filtered_selection.len()]; // Just random number generation for now. Replace the macroquad:rand:rand() with the eventual selection the player makes.
             println!("Selected {:?}.", selection);
             Some(source.swap_remove(source.iter().position(|card| card == selection).unwrap()))
         } else {
@@ -133,9 +139,12 @@ impl GameData {
     }
 
     fn select_hand(source: &Vec<Vec<Card>>, filter: impl Fn(usize) -> bool) -> usize {
-        // Just random number generation for now.
+        //
+        // Same thing in here, put the same `fn Draw` function, except instead of grabbing a card from the source set, it's selecting a player's hand.
+        // Doesn't need to be too fancy, as long as it works.
+        //
         loop {
-            let selection = (macroquad::rand::rand() as usize) % source.len();
+            let selection = (macroquad::rand::rand() as usize) % source.len(); // Replace the macroquad:rand:rand() with the eventual selection the player makes.
             println!("Selected {:?}.", selection);
             if (filter(selection)) {
                 return selection;
@@ -160,7 +169,6 @@ impl GameData {
             GameData::draw_card(&mut self.deck_creature, player);
             GameData::draw_card(&mut self.deck_mutation, player);
             GameData::draw_card(&mut self.deck_item, player);
-            println!("Current hand is {:?}.", player);
         }
 
         // Moving all of the special cards over to the loot deck.
@@ -228,7 +236,7 @@ impl GameData {
                 );
 
                 // Middle turn.
-                if self.player_hands[self.current_player as usize].len() > 0 {
+                if self.player_fields[self.current_player as usize].len() > 0 {
                     let mut has_performed_action = false;
                     // Handling items. (NOT MUTATIONS!)
                     if !has_performed_action {
@@ -245,7 +253,9 @@ impl GameData {
                         }
                     }
                     // Handling combat.
-                    if !has_performed_action {
+                    if !has_performed_action
+                        && self.player_fields[self.current_player as usize].len() > 0
+                    {
                         println!("Select attackers.");
                         let attacker = GameData::select_card(
                             &mut self.player_fields[self.current_player as usize],
