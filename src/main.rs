@@ -6,13 +6,59 @@ mod view_creature;
 mod view_item;
 mod view_jelly;
 mod view_mutation;
+use chrono::prelude::*;
 use macroquad::prelude::*;
 use player_turn::TurnState;
 
-#[macroquad::main("Jelly Jam")]
-async fn main() {
+use error_chain::error_chain;
+use log::LevelFilter;
+use log4rs::append::console::ConsoleAppender;
+use log4rs::append::file::FileAppender;
+use log4rs::config::{Appender, Config, Root};
+use log4rs::encode::pattern::PatternEncoder;
+
+error_chain! {
+    foreign_links {
+        Io(std::io::Error);
+        LogConfig(log4rs::config::FormatError);
+        SetLogger(log::SetLoggerError);
+    }
+}
+
+async fn run() -> Result<()> {
     let mut state = GameState::Menu;
     let mut turn_state = TurnState::Player1;
+
+    // For some logging.
+    let log_file = FileAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(
+            "[{d(%Y-%m-%d %H:%M:%S)}] {l} - {m}{n}",
+        )))
+        .build(format!(
+            "log/output-{}.log",
+            Utc::now().format("%Y-%m-%d_%H-%M-%S").to_string()
+        ))
+        .unwrap();
+    let log_console = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(
+            "{h([{d(%Y-%m-%d %H:%M:%S)}] {l})} - {m}{n}",
+        )))
+        .build();
+
+    // Setting our config.
+    log4rs::init_config(
+        Config::builder()
+            .appender(Appender::builder().build("log_file", Box::new(log_file)))
+            .appender(Appender::builder().build("log_console", Box::new(log_console)))
+            .build(
+                Root::builder()
+                    .appender("log_file")
+                    .appender("log_console")
+                    .build(LevelFilter::Info),
+            )
+            .unwrap(),
+    )
+    .unwrap();
 
     // Load textures at the start
     let background_texture =
@@ -28,7 +74,7 @@ async fn main() {
     let mutation_textures = view_mutation::load_card_mutation().await;
 
     // Main game loop
-    loop {
+    'main: loop {
         // Clear the screen each frame
         clear_background(BLACK);
 
@@ -97,19 +143,19 @@ async fn main() {
                             && mouse_y < y + button_height
                         {
                             match *label {
-                                "Single Play" => println!("Single Play button clicked!"),
+                                "Single Play" => log::info!("Single Play button clicked!"),
                                 "Multi Play" => {
-                                    println!("Multi Play button clicked!");
+                                    log::info!("Multi Play button clicked!");
                                     state = GameState::InGame; // Start main multiplayer loop
                                 }
                                 "Rules" => {
-                                    println!("Rules button clicked!");
+                                    log::info!("Rules button clicked!");
                                     state = GameState::Rules; // Switch to the Rules state
                                 }
-                                "Settings" => println!("Settings button clicked!"),
+                                "Settings" => log::info!("Settings button clicked!"),
                                 "Quit" => {
-                                    println!("Quit button clicked!");
-                                    std::process::exit(0);
+                                    log::info!("Quit button clicked!");
+                                    break 'main;
                                 }
                                 _ => {}
                             }
@@ -162,6 +208,25 @@ async fn main() {
 
         // Synchronize the frame
         next_frame().await;
+    }
+
+    Ok(())
+}
+
+#[macroquad::main("Jelly Jam")]
+async fn main() {
+    if let Err(ref errors) = run().await {
+        eprintln!("Error level - Description");
+        errors
+            .iter()
+            .enumerate()
+            .for_each(|(index, error)| eprintln!("└> {} - {}", index, error));
+
+        if let Some(backtrace) = errors.backtrace() {
+            eprintln!("{:?}", backtrace);
+        }
+
+        ::std::process::exit(1);
     }
 }
 

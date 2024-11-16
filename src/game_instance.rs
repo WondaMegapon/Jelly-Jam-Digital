@@ -1,6 +1,9 @@
-use std::ops::{DerefMut, Index, Sub, SubAssign};
+use std::ops::SubAssign;
 
-use macroquad::rand::ChooseRandom;
+use macroquad::{
+    rand::ChooseRandom,
+    window::{clear_background, next_frame},
+};
 
 #[derive(Debug)]
 pub struct Player {}
@@ -114,7 +117,7 @@ impl GameData {
             fresh_card.current_defense = fresh_card.base_defense;
             destination.push(fresh_card.clone()); // Move it out of one and into the other.
         } else {
-            println!("No cards left in source!"); // Scream and cry.
+            log::info!("No cards left in source!"); // Scream and cry.
         }
     }
 
@@ -130,10 +133,10 @@ impl GameData {
         if filtered_selection.len() > 0 {
             let selection =
                 &filtered_selection[(macroquad::rand::rand() as usize) % filtered_selection.len()]; // Just random number generation for now. Replace the macroquad:rand:rand() with the eventual selection the player makes.
-            println!("Selected {:?}.", selection);
+            log::info!("Selected {:?}.", selection);
             Some(source.swap_remove(source.iter().position(|card| card == selection).unwrap()))
         } else {
-            println!("Guess not...");
+            log::info!("Guess not...");
             None
         }
     }
@@ -145,7 +148,7 @@ impl GameData {
         //
         loop {
             let selection = (macroquad::rand::rand() as usize) % source.len(); // Replace the macroquad:rand:rand() with the eventual selection the player makes.
-            println!("Selected {:?}.", selection);
+            log::info!("Selected {:?}.", selection);
             if (filter(selection)) {
                 return selection;
             }
@@ -163,7 +166,7 @@ impl GameData {
 
         // Giving each player their starting hand.
         for (index, player) in self.player_hands.iter_mut().enumerate() {
-            println!("Drawing starting hand for Player {}", index);
+            log::info!("Drawing starting hand for Player {}", index);
             GameData::draw_card(&mut self.deck_jelly, player);
             GameData::draw_card(&mut self.deck_jelly, player);
             GameData::draw_card(&mut self.deck_creature, player);
@@ -172,37 +175,37 @@ impl GameData {
         }
 
         // Moving all of the special cards over to the loot deck.
-        println!("Moving everything to the loot pile...");
+        log::info!("Moving everything to the loot pile...");
         self.deck_loot.append(&mut self.deck_creature);
         self.deck_loot.append(&mut self.deck_mutation);
         self.deck_loot.append(&mut self.deck_item);
         self.deck_loot.shuffle();
 
         // Moving our loot deck to the prize pool.
-        println!("Here are the prize cards.");
+        log::info!("Here are the prize cards.");
         for _iterator in 0..(self.player_count - 1) {
             GameData::draw_card(&mut self.deck_loot, &mut self.deck_prize_pool);
-            println!(
+            log::info!(
                 "A {:?} is in the prize pool!",
                 &self.deck_prize_pool.last().unwrap()
             );
         }
 
         // For each round.
-        println!("Now let's get the game started.");
+        log::info!("Now let's get the game started.");
         'round: loop {
             // Pre-round.
-            println!("Starting Round {:?}.", self.current_round + 1);
+            log::info!("Starting Round {:?}.", self.current_round + 1);
             // Everybody plays two living cards.
             for _iterator in 0..self.player_count {
-                println!("Player {}, play two cards.", self.current_player);
+                log::info!("Player {}, play two cards.", self.current_player);
                 for _iterator in 0..2 {
                     let mut selected_card = GameData::select_card(
                         &mut self.player_hands[self.current_player as usize],
                         |card| card.color == CardColor::Jelly || card.color == CardColor::Creature,
                     );
                     if selected_card.is_some() {
-                        println!("Any mutations?");
+                        log::info!("Any mutations?");
                         let mutation_card = GameData::select_card(
                             &mut self.player_hands[self.current_player as usize],
                             |card| card.color == CardColor::Mutation,
@@ -218,7 +221,7 @@ impl GameData {
                             &mut self.player_fields[self.current_player as usize],
                         );
                     } else {
-                        println!("...No cards to play?");
+                        log::info!("...No cards to play?");
                     }
                 }
                 self.current_player = (self.current_player + 1) % (self.player_hands.len() as u8);
@@ -227,20 +230,21 @@ impl GameData {
             // Now for the primary game loop.
             'turn: loop {
                 // Start turn.
-                println!("Starting Player {}'s turn!", self.current_player);
+                log::info!("Starting Player {}'s turn!", self.current_player);
                 // Reading out the current board state.
-                println!("Here's the current battlefield. {:?}", self.player_fields);
-                println!(
+                log::info!("Here's the current battlefield. {:?}", self.player_fields);
+                log::info!(
                     "And your hand. {:?}",
                     self.player_hands[self.current_player as usize]
                 );
+                self.draw().await; // Good to render before anything happens.
 
                 // Middle turn.
                 if self.player_fields[self.current_player as usize].len() > 0 {
                     let mut has_performed_action = false;
                     // Handling items. (NOT MUTATIONS!)
                     if !has_performed_action {
-                        println!("Select items.");
+                        log::info!("Select items.");
                         let item = GameData::select_card(
                             &mut self.player_fields[self.current_player as usize],
                             |card| card.color == CardColor::Item,
@@ -256,25 +260,25 @@ impl GameData {
                     if !has_performed_action
                         && self.player_fields[self.current_player as usize].len() > 0
                     {
-                        println!("Select attackers.");
+                        log::info!("Select attackers.");
                         let attacker = GameData::select_card(
                             &mut self.player_fields[self.current_player as usize],
                             |card| card.current_damage.is_some_and(|x| x > 0),
                         );
                         if attacker.as_ref().is_some() {
-                            println!("Select who you're attacking.");
+                            log::info!("Select who you're attacking.");
                             let target_field = GameData::select_hand(&self.player_fields, |hand| {
                                 hand != self.current_player as usize
                                     && self.player_fields[hand].len() > 0
                             });
-                            println!("Select which card you're attacking.");
+                            log::info!("Select which card you're attacking.");
                             let defender = &mut GameData::select_card(
                                 &mut self.player_fields[target_field],
                                 |card| card.current_health.is_some(),
                             );
                             let roll = (macroquad::rand::rand() % 6 + 1) as i8;
                             if roll >= defender.as_ref().unwrap().current_defense.unwrap() {
-                                println!("{}! Successful roll!", roll);
+                                log::info!("{}! Successful roll!", roll);
                                 defender
                                     .as_mut()
                                     .unwrap()
@@ -289,7 +293,7 @@ impl GameData {
                                     .is_some_and(|x| x <= 0)
                                 {
                                     // Discard.
-                                    println!("{:?} defeated...", defender.as_ref().unwrap());
+                                    log::info!("{:?} defeated...", defender.as_ref().unwrap());
 
                                     // Special cases for jellies.
                                     while defender.as_mut().unwrap().modifier_effects.len() > 0 {
@@ -313,7 +317,7 @@ impl GameData {
 
                                     // Handling placement if that was their last card.
                                     if self.player_fields[target_field].len() <= 0 {
-                                        println!("Player {} has been knocked out.", target_field);
+                                        log::info!("Player {} has been knocked out.", target_field);
                                         self.player_placement.push(target_field);
                                     }
                                 } else {
@@ -322,7 +326,7 @@ impl GameData {
                                         .push(defender.clone().unwrap());
                                 }
                             } else {
-                                println!("{}. Failed roll.", roll);
+                                log::info!("{}. Failed roll.", roll);
                                 self.player_fields[target_field].push(defender.clone().unwrap());
                             }
                             // Putting the card back.
@@ -330,12 +334,12 @@ impl GameData {
                             self.player_fields[self.current_player as usize]
                                 .push(attacker.unwrap());
                         } else {
-                            println!("No valid attackers.");
+                            log::info!("No valid attackers.");
                         }
                     }
                     // Handling withdrawing.
                     if !has_performed_action {
-                        println!("Select deserters.");
+                        log::info!("Select deserters.");
                         let mut deserter = GameData::select_card(
                             &mut self.player_fields[self.current_player as usize],
                             |_x| true,
@@ -352,7 +356,7 @@ impl GameData {
                         }
                     }
                 } else {
-                    println!(
+                    log::info!(
                         "Player {} has no cards on their field, so we're skipping their turn.",
                         self.current_player
                     )
@@ -361,7 +365,7 @@ impl GameData {
                 // End turn.
                 // Discard down to eight.
                 while self.player_hands[self.current_player as usize].len() > 8 {
-                    println!("Please discard down to eight cards.");
+                    log::info!("Please discard down to eight cards.");
                     let mut selected_card = GameData::select_card(
                         &mut self.player_hands[self.current_player as usize],
                         |_iterator| true,
@@ -399,7 +403,7 @@ impl GameData {
                     // Moving the last card over.
                     let mut last_card = self.player_fields[self.current_player as usize].pop();
                     if last_card.is_some() {
-                        println!("Moving {:?} back to hand.", last_card.as_ref().unwrap());
+                        log::info!("Moving {:?} back to hand.", last_card.as_ref().unwrap());
                         while last_card.as_mut().unwrap().modifier_effects.len() > 0 {
                             self.deck_loot
                                 .push(last_card.as_mut().unwrap().modifier_effects.pop().unwrap());
@@ -417,14 +421,14 @@ impl GameData {
             }
             // Post-round
             self.player_placement.reverse(); // Reversing the placement.
-            println!("Round end. Player {} won!", self.player_placement[0]);
+            log::info!("Round end. Player {} won!", self.player_placement[0]);
             self.player_victories[self.player_placement[0]] += 1; // Incrementing score.
 
             // Stating placements.
-            println!("The placements are {:?}", self.player_placement);
+            log::info!("The placements are {:?}", self.player_placement);
 
             // If anybody has passed the threshold.
-            println!("The current scores are {:?}", self.player_victories);
+            log::info!("The current scores are {:?}", self.player_victories);
             if self
                 .player_victories
                 .iter()
@@ -435,7 +439,7 @@ impl GameData {
 
             // Handling prizes.
             for iterator in 0..(self.player_placement.len() - 1) {
-                println!(
+                log::info!(
                     "Player {}, please pick a prize card.",
                     self.player_placement[iterator]
                 );
@@ -447,10 +451,10 @@ impl GameData {
             self.player_placement.clear(); // Clearing the placement.
 
             // Moving our loot deck to the prize pool.
-            println!("Here are the prize cards.");
+            log::info!("Here are the prize cards.");
             for _iterator in 0..(self.player_count - 1) {
                 GameData::draw_card(&mut self.deck_loot, &mut self.deck_prize_pool);
-                println!(
+                log::info!(
                     "A {:?} is in the prize pool!",
                     &self.deck_prize_pool.last().unwrap()
                 );
@@ -458,20 +462,30 @@ impl GameData {
 
             // Drawing new Jellies.
             for (index, player) in self.player_hands.iter_mut().enumerate() {
-                println!("Drawing new jellies for Player {}", index);
+                log::info!("Drawing new jellies for Player {}", index);
                 GameData::draw_card(&mut self.deck_jelly, player);
                 if !player.iter().any(|card| card.color == CardColor::Jelly) {
-                    println!("And an extra...");
+                    log::info!("And an extra...");
                     GameData::draw_card(&mut self.deck_jelly, player);
                 }
-                println!("Current hand is {:?}.", player);
+                log::info!("Current hand is {:?}.", player);
             }
 
             // Incrementing our Round counter.
             self.current_round += 1;
         }
         // SOMEBODY WON!
-        println!("And we have a winner!");
+        log::info!("And we have a winner!");
+    }
+
+    // For drawing everything to the screen.
+    pub async fn draw(&mut self) {
+        clear_background(macroquad::color::BLACK); // Emptying the current buffer.
+
+        // Time to draw everything.
+        //
+
+        next_frame().await; // Drawing that next frame.
     }
 }
 
@@ -611,12 +625,12 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
     match current_phase {
         Phases::OnDraw => match current_card.base_effects {
             _ => {
-                println!("Card {:?} has no OnDraw effect.", current_card.base_effects);
+                log::info!("Card {:?} has no OnDraw effect.", current_card.base_effects);
             }
         },
         Phases::OnDiscard => match current_card.base_effects {
             _ => {
-                println!(
+                log::info!(
                     "Card {:?} has no OnDiscard effect.",
                     current_card.base_effects
                 );
@@ -624,7 +638,7 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
         },
         Phases::OnBounce => match current_card.base_effects {
             _ => {
-                println!(
+                log::info!(
                     "Card {:?} has no OnBounce effect.",
                     current_card.base_effects
                 );
@@ -632,7 +646,7 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
         },
         Phases::OnTurnStart => match current_card.base_effects {
             _ => {
-                println!(
+                log::info!(
                     "Card {:?} has no OnTurnStart effect.",
                     current_card.base_effects
                 );
@@ -640,7 +654,7 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
         },
         Phases::OnTurnEnd => match current_card.base_effects {
             _ => {
-                println!(
+                log::info!(
                     "Card {:?} has no OnTurnEnd effect.",
                     current_card.base_effects
                 );
@@ -648,7 +662,7 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
         },
         Phases::OnEnter => match current_card.base_effects {
             _ => {
-                println!(
+                log::info!(
                     "Card {:?} has no OnEnter effect.",
                     current_card.base_effects
                 );
@@ -656,7 +670,7 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
         },
         Phases::OnExit => match current_card.base_effects {
             _ => {
-                println!("Card {:?} has no OnExit effect.", current_card.base_effects);
+                log::info!("Card {:?} has no OnExit effect.", current_card.base_effects);
             }
         },
         Phases::OnAttack => match current_card.base_effects {
@@ -664,7 +678,7 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
                 // Nothing survives a hit from this card.
             }
             _ => {
-                println!(
+                log::info!(
                     "Card {:?} has no OnAttack effect.",
                     current_card.base_effects
                 );
@@ -678,7 +692,7 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
                 // Cards that fail an attack roll are sent back to their player's hand.
             }
             _ => {
-                println!(
+                log::info!(
                     "Card {:?} has no OnDamaged effect.",
                     current_card.base_effects
                 );
@@ -691,7 +705,7 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
     // For any behavior.
     match current_card {
         _ => {
-            println!("Card {:?} has no OnAny effect.", current_card.base_effects);
+            log::info!("Card {:?} has no OnAny effect.", current_card.base_effects);
         }
     }
 }

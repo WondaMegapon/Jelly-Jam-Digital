@@ -38,7 +38,7 @@ impl PlayerTurnAudio {
             self.sink.append(source);
             self.sink.play();
         } else {
-            println!("Failed to decode audio");
+            log::info!("Failed to decode audio");
         }
     }
 
