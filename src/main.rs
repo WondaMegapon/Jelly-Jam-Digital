@@ -216,12 +216,12 @@ enum Phases {
 fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
     // For phase specific behavior.
     match current_phase {
-        Phases::OnDraw => match current_card {
+        Phases::OnDraw => match current_card.base_effects {
             _ => {
                 println!("Card {:?} has no OnDraw effect.", current_card.base_effects);
             }
         },
-        Phases::OnDiscard => match current_card {
+        Phases::OnDiscard => match current_card.base_effects {
             _ => {
                 println!(
                     "Card {:?} has no OnDiscard effect.",
@@ -229,7 +229,7 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
                 );
             }
         },
-        Phases::OnBounce => match current_card {
+        Phases::OnBounce => match current_card.base_effects {
             _ => {
                 println!(
                     "Card {:?} has no OnBounce effect.",
@@ -237,7 +237,7 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
                 );
             }
         },
-        Phases::OnTurnStart => match current_card {
+        Phases::OnTurnStart => match current_card.base_effects {
             _ => {
                 println!(
                     "Card {:?} has no OnTurnStart effect.",
@@ -245,7 +245,7 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
                 );
             }
         },
-        Phases::OnTurnEnd => match current_card {
+        Phases::OnTurnEnd => match current_card.base_effects {
             _ => {
                 println!(
                     "Card {:?} has no OnTurnEnd effect.",
@@ -253,7 +253,7 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
                 );
             }
         },
-        Phases::OnEnter => match current_card {
+        Phases::OnEnter => match current_card.base_effects {
             _ => {
                 println!(
                     "Card {:?} has no OnEnter effect.",
@@ -261,12 +261,15 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
                 );
             }
         },
-        Phases::OnExit => match current_card {
+        Phases::OnExit => match current_card.base_effects {
             _ => {
                 println!("Card {:?} has no OnExit effect.", current_card.base_effects);
             }
         },
-        Phases::OnAttack => match current_card {
+        Phases::OnAttack => match current_card.base_effects {
+            CardName::Oodalah => {
+                // Nothing survives a hit from this card.
+            }
             _ => {
                 println!(
                     "Card {:?} has no OnAttack effect.",
@@ -274,7 +277,13 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
                 );
             }
         },
-        Phases::OnDamaged => match current_card {
+        Phases::OnDamaged => match current_card.base_effects {
+            CardName::Zor => {
+                // This creature cannot attack until it takes damage.
+            }
+            CardName::Rock => {
+                // Cards that fail an attack roll are sent back to their player's hand.
+            }
             _ => {
                 println!(
                     "Card {:?} has no OnDamaged effect.",
@@ -282,7 +291,7 @@ fn resolve_phase_for_card(current_phase: Phases, current_card: Card) {
                 );
             }
         },
-        Phases::OnAny => match current_card {
+        Phases::OnAny => match current_card.base_effects {
             _ => {}
         },
     }
