@@ -127,6 +127,7 @@ impl GameData {
             println!("Selected {:?}.", selection);
             Some(source.swap_remove(source.iter().position(|card| card == selection).unwrap()))
         } else {
+            println!("Guess not...");
             None
         }
     }
@@ -185,22 +186,34 @@ impl GameData {
             // Pre-round.
             println!("Starting Round {:?}.", self.current_round + 1);
             // Everybody plays two living cards.
-            for player in 0..self.player_count {
-                println!("Player {}, play two cards.", player);
+            for _iterator in 0..self.player_count {
+                println!("Player {}, play two cards.", self.current_player);
                 for _iterator in 0..2 {
-                    let selected_card =
-                        GameData::select_card(&mut self.player_hands[player as usize], |card| {
-                            card.color == CardColor::Jelly || card.color == CardColor::Creature
-                        });
+                    let mut selected_card = GameData::select_card(
+                        &mut self.player_hands[self.current_player as usize],
+                        |card| card.color == CardColor::Jelly || card.color == CardColor::Creature,
+                    );
                     if selected_card.is_some() {
+                        println!("Any mutations?");
+                        let mutation_card = GameData::select_card(
+                            &mut self.player_hands[self.current_player as usize],
+                            |card| card.color == CardColor::Mutation,
+                        );
+                        if mutation_card.is_some() {
+                            GameData::move_card(
+                                mutation_card.unwrap(),
+                                &mut selected_card.as_mut().unwrap().modifier_effects,
+                            );
+                        }
                         GameData::move_card(
                             selected_card.unwrap(),
-                            &mut self.player_fields[player as usize],
+                            &mut self.player_fields[self.current_player as usize],
                         );
                     } else {
                         println!("...No cards to play?");
                     }
                 }
+                self.current_player = (self.current_player + 1) % (self.player_hands.len() as u8);
             }
 
             // Now for the primary game loop.
@@ -209,24 +222,6 @@ impl GameData {
                 println!("Starting Player {}'s turn!", self.current_player);
                 // Reading out the current board state.
                 println!("Here's the current battlefield. {:?}", self.player_fields);
-                // And quietly performing the board check.
-                if self
-                    .player_fields
-                    .iter()
-                    .filter(|field| field.len() > 0)
-                    .count()
-                    <= 1
-                {
-                    // Moving the last card over.
-                    let last_card = self.player_fields[self.current_player as usize].pop();
-                    if last_card.is_some() {
-                        GameData::move_card(
-                            last_card.unwrap(),
-                            &mut self.player_hands[self.current_player as usize],
-                        );
-                    }
-                    break 'turn;
-                }
                 println!(
                     "And your hand. {:?}",
                     self.player_hands[self.current_player as usize]
@@ -234,9 +229,23 @@ impl GameData {
 
                 // Middle turn.
                 if self.player_hands[self.current_player as usize].len() > 0 {
+                    let mut has_performed_action = false;
                     // Handling items. (NOT MUTATIONS!)
+                    if !has_performed_action {
+                        println!("Select items.");
+                        let item = GameData::select_card(
+                            &mut self.player_fields[self.current_player as usize],
+                            |card| card.color == CardColor::Item,
+                        );
+                        if item.is_some() {
+                            has_performed_action = true;
+                            // TODO: Perform item action.
+                            self.deck_loot.push(item.unwrap());
+                            self.deck_loot.shuffle();
+                        }
+                    }
                     // Handling combat.
-                    {
+                    if !has_performed_action {
                         println!("Select attackers.");
                         let attacker = GameData::select_card(
                             &mut self.player_fields[self.current_player as usize],
@@ -273,6 +282,17 @@ impl GameData {
                                     println!("{:?} defeated...", defender.as_ref().unwrap());
 
                                     // Special cases for jellies.
+                                    while defender.as_mut().unwrap().modifier_effects.len() > 0 {
+                                        self.deck_loot.push(
+                                            defender
+                                                .as_mut()
+                                                .unwrap()
+                                                .modifier_effects
+                                                .pop()
+                                                .unwrap(),
+                                        );
+                                        self.deck_loot.shuffle();
+                                    }
                                     if defender.as_ref().unwrap().color == CardColor::Jelly {
                                         self.deck_jelly.push(defender.clone().unwrap());
                                         self.deck_jelly.shuffle();
@@ -296,13 +316,31 @@ impl GameData {
                                 self.player_fields[target_field].push(defender.clone().unwrap());
                             }
                             // Putting the card back.
+                            has_performed_action = true;
                             self.player_fields[self.current_player as usize]
                                 .push(attacker.unwrap());
                         } else {
                             println!("No valid attackers.");
                         }
                     }
-                // Handling withdrawing.
+                    // Handling withdrawing.
+                    if !has_performed_action {
+                        println!("Select deserters.");
+                        let mut deserter = GameData::select_card(
+                            &mut self.player_fields[self.current_player as usize],
+                            |_x| true,
+                        );
+                        if deserter.is_some() {
+                            // has_performed_action = true;
+                            while deserter.as_mut().unwrap().modifier_effects.len() > 0 {
+                                self.deck_loot.push(
+                                    deserter.as_mut().unwrap().modifier_effects.pop().unwrap(),
+                                );
+                                self.deck_loot.shuffle();
+                            }
+                            self.player_hands[self.current_player as usize].push(deserter.unwrap());
+                        }
+                    }
                 } else {
                     println!(
                         "Player {} has no cards on their field, so we're skipping their turn.",
@@ -314,10 +352,21 @@ impl GameData {
                 // Discard down to eight.
                 while self.player_hands[self.current_player as usize].len() > 8 {
                     println!("Please discard down to eight cards.");
-                    let selected_card = GameData::select_card(
+                    let mut selected_card = GameData::select_card(
                         &mut self.player_hands[self.current_player as usize],
                         |_iterator| true,
                     );
+                    while selected_card.as_mut().unwrap().modifier_effects.len() > 0 {
+                        self.deck_loot.push(
+                            selected_card
+                                .as_mut()
+                                .unwrap()
+                                .modifier_effects
+                                .pop()
+                                .unwrap(),
+                        );
+                        self.deck_loot.shuffle();
+                    }
                     if selected_card.as_ref().unwrap().color == CardColor::Jelly {
                         self.deck_jelly.push(selected_card.unwrap());
                         self.deck_jelly.shuffle();
@@ -326,6 +375,34 @@ impl GameData {
                         self.deck_loot.shuffle();
                     }
                 }
+                // And quietly performing the board check.
+                if self
+                    .player_fields
+                    .iter()
+                    .filter(|field| field.len() > 0)
+                    .count()
+                    <= 1
+                {
+                    // Marking placements.
+                    self.player_placement.push(self.current_player as usize);
+
+                    // Moving the last card over.
+                    let mut last_card = self.player_fields[self.current_player as usize].pop();
+                    if last_card.is_some() {
+                        println!("Moving {:?} back to hand.", last_card.as_ref().unwrap());
+                        while last_card.as_mut().unwrap().modifier_effects.len() > 0 {
+                            self.deck_loot
+                                .push(last_card.as_mut().unwrap().modifier_effects.pop().unwrap());
+                            self.deck_loot.shuffle();
+                        }
+                        GameData::move_card(
+                            last_card.unwrap(),
+                            &mut self.player_hands[self.current_player as usize],
+                        );
+                    }
+                    break 'turn;
+                }
+                // Moving along.
                 self.current_player = (self.current_player + 1) % (self.player_hands.len() as u8);
             }
             // Post-round
@@ -333,13 +410,28 @@ impl GameData {
             println!("Round end. Player {} won!", self.player_placement[0]);
             self.player_victories[self.player_placement[0]] += 1; // Incrementing score.
 
-            // Handling prizes.
+            // Stating placements.
             println!("The placements are {:?}", self.player_placement);
+
+            // If anybody has passed the threshold.
+            println!("The current scores are {:?}", self.player_victories);
+            if self
+                .player_victories
+                .iter()
+                .any(|victory| victory >= &self.victory_threshold)
+            {
+                break 'round;
+            }
+
+            // Handling prizes.
             for iterator in 0..(self.player_placement.len() - 1) {
-                println!("Player {}, please pick a prize card.", iterator);
+                println!(
+                    "Player {}, please pick a prize card.",
+                    self.player_placement[iterator]
+                );
                 GameData::move_card(
                     GameData::select_card(&mut self.deck_prize_pool, |_x| true).unwrap(),
-                    &mut self.player_hands[iterator],
+                    &mut self.player_hands[self.player_placement[iterator]],
                 );
             }
             self.player_placement.clear(); // Clearing the placement.
@@ -367,10 +459,9 @@ impl GameData {
 
             // Incrementing our Round counter.
             self.current_round += 1;
-            if self.current_round == 3 {
-                break 'round;
-            }
         }
+        // SOMEBODY WON!
+        println!("And we have a winner!");
     }
 }
 
