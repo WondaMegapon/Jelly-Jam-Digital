@@ -7,7 +7,7 @@ mod view_item;
 mod view_jelly;
 mod view_mutation;
 use chrono::prelude::*;
-use macroquad::prelude::*;
+use macroquad::{prelude::*, window};
 use player_turn::TurnState;
 
 use error_chain::error_chain;
@@ -213,7 +213,17 @@ async fn run() -> Result<()> {
     Ok(())
 }
 
-#[macroquad::main("Jelly Jam")]
+// Windows config.
+fn quad_config() -> Conf {
+    Conf {
+        window_title: "Jelly Jam".to_string(),
+        fullscreen: true,
+        window_resizable: true,
+        ..Default::default()
+    }
+}
+
+#[macroquad::main(quad_config)]
 async fn main() {
     if let Err(ref errors) = run().await {
         eprintln!("Error level - Description");

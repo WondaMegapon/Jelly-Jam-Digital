@@ -188,6 +188,7 @@ impl GameData {
             if (filter(selection)) {
                 return selection;
             }
+            log::info!("Please pick a different one.");
         }
     }
 
@@ -232,21 +233,25 @@ impl GameData {
         'round: loop {
             // Pre-round.
             log::info!("Starting Round {:?}.", self.current_round + 1);
+            self.draw(0.0).await;
             // Everybody plays two living cards.
             for _iterator in 0..self.player_count {
                 log::info!("Player {}, play two cards.", self.current_player);
                 for _iterator in 0..2 {
+                    self.draw(0.1).await;
                     let mut selected_card = GameData::select_card(
                         &mut self.player_hands[self.current_player as usize],
                         |card| card.color == CardColor::Jelly || card.color == CardColor::Creature,
                     );
                     if selected_card.is_some() {
+                        self.draw(0.1).await;
                         log::info!("Any mutations?");
                         let mutation_card = GameData::select_card(
                             &mut self.player_hands[self.current_player as usize],
                             |card| card.color == CardColor::Mutation,
                         );
                         if mutation_card.is_some() {
+                            self.draw(0.1).await;
                             GameData::move_card(
                                 mutation_card.unwrap(),
                                 &mut selected_card.as_mut().unwrap().modifier_effects,
@@ -259,6 +264,7 @@ impl GameData {
                     } else {
                         log::info!("...No cards to play?");
                     }
+                    self.draw(0.2).await;
                 }
                 self.current_player = (self.current_player + 1) % (self.player_hands.len() as u8);
             }
@@ -273,7 +279,7 @@ impl GameData {
                     "And your hand. {:?}",
                     self.player_hands[self.current_player as usize]
                 );
-                self.draw().await; // Good to render before anything happens.
+                self.draw(0.2).await; // Good to render before anything happens.
 
                 // Middle turn.
                 if self.player_fields[self.current_player as usize].len() > 0 {
@@ -296,12 +302,14 @@ impl GameData {
                     if !has_performed_action
                         && self.player_fields[self.current_player as usize].len() > 0
                     {
+                        self.draw(0.1).await;
                         log::info!("Select attackers.");
                         let attacker = GameData::select_card(
                             &mut self.player_fields[self.current_player as usize],
                             |card| card.current_damage.is_some_and(|x| x > 0),
                         );
                         if attacker.as_ref().is_some() {
+                            self.draw(0.1).await;
                             log::info!("Select who you're attacking.");
                             let target_field = GameData::select_hand(&self.player_fields, |hand| {
                                 hand != self.current_player as usize
@@ -312,6 +320,7 @@ impl GameData {
                                 &mut self.player_fields[target_field],
                                 |card| card.current_health.is_some(),
                             );
+                            self.draw(0.1).await;
                             let roll = (macroquad::rand::rand() % 6 + 1) as i8;
                             if roll >= defender.as_ref().unwrap().current_defense.unwrap() {
                                 log::info!("{}! Successful roll!", roll);
@@ -372,15 +381,18 @@ impl GameData {
                         } else {
                             log::info!("No valid attackers.");
                         }
+                        self.draw(0.1).await;
                     }
                     // Handling withdrawing.
                     if !has_performed_action {
+                        self.draw(0.1).await;
                         log::info!("Select deserters.");
                         let mut deserter = GameData::select_card(
                             &mut self.player_fields[self.current_player as usize],
                             |_x| true,
                         );
                         if deserter.is_some() {
+                            self.draw(0.1).await;
                             // has_performed_action = true;
                             while deserter.as_mut().unwrap().modifier_effects.len() > 0 {
                                 self.deck_loot.push(
@@ -389,6 +401,14 @@ impl GameData {
                                 self.deck_loot.shuffle();
                             }
                             self.player_hands[self.current_player as usize].push(deserter.unwrap());
+                            // And the reprecussions of doing that.
+                            if self.player_fields[self.current_player as usize].len() <= 0 {
+                                log::info!(
+                                    "Player {} has been knocked out.",
+                                    self.current_player as usize
+                                );
+                                self.player_placement.push(self.current_player as usize);
+                            }
                         }
                     }
                 } else {
@@ -401,6 +421,7 @@ impl GameData {
                 // End turn.
                 // Discard down to eight.
                 while self.player_hands[self.current_player as usize].len() > 8 {
+                    self.draw(0.1).await;
                     log::info!("Please discard down to eight cards.");
                     let mut selected_card = GameData::select_card(
                         &mut self.player_hands[self.current_player as usize],
@@ -424,6 +445,7 @@ impl GameData {
                         self.deck_loot.push(selected_card.unwrap());
                         self.deck_loot.shuffle();
                     }
+                    self.draw(0.1).await;
                 }
                 // And quietly performing the board check.
                 if self
@@ -440,6 +462,7 @@ impl GameData {
                     while self.player_fields[self.current_player as usize].len() > 0 {
                         let mut last_card = self.player_fields[self.current_player as usize].pop();
                         if last_card.is_some() {
+                            self.draw(0.1).await;
                             log::info!("Moving {:?} back to hand.", last_card.as_ref().unwrap());
                             while last_card.as_mut().unwrap().modifier_effects.len() > 0 {
                                 GameData::move_card(
@@ -478,6 +501,7 @@ impl GameData {
 
             // Handling prizes.
             for iterator in 0..(self.player_placement.len() - 1) {
+                self.draw(0.1).await;
                 log::info!(
                     "Player {}, please pick a prize card.",
                     self.player_placement[iterator]
@@ -486,12 +510,14 @@ impl GameData {
                     GameData::select_card(&mut self.deck_prize_pool, |_x| true).unwrap(),
                     &mut self.player_hands[self.player_placement[iterator]],
                 );
+                self.draw(0.1).await;
             }
             self.player_placement.clear(); // Clearing the placement.
 
             // Moving our loot deck to the prize pool.
             log::info!("Here are the prize cards.");
             for _iterator in 0..(self.player_count - 1) {
+                self.draw(0.05).await;
                 GameData::draw_card(&mut self.deck_loot, &mut self.deck_prize_pool);
                 log::info!(
                     "A {:?} is in the prize pool!",
@@ -502,11 +528,14 @@ impl GameData {
             // Drawing new Jellies.
             for (index, player) in self.player_hands.iter_mut().enumerate() {
                 log::info!("Drawing new jellies for Player {}", index);
-                GameData::draw_card(&mut self.deck_jelly, player);
-                if !player.iter().any(|card| card.color == CardColor::Jelly) {
+                if !player
+                    .iter()
+                    .any(|card| card.color == CardColor::Jelly || card.color == CardColor::Creature)
+                {
                     log::info!("And an extra...");
                     GameData::draw_card(&mut self.deck_jelly, player);
                 }
+                GameData::draw_card(&mut self.deck_jelly, player);
                 log::info!("Current hand is {:?}.", player);
             }
 
@@ -518,20 +547,43 @@ impl GameData {
     }
 
     // For drawing everything to the screen.
-    pub async fn draw(&mut self) {
-        clear_background(macroquad::color::BLACK); // Emptying the current buffer.
+    pub async fn draw(&mut self, debug_wait_seconds: f32) {
+        clear_background(macroquad::color::WHITE); // Emptying the current buffer.
 
         // Time to draw everything.
         //
 
+        // Prize pool first, since it's unimportant.
+        for (card_index, card) in self.deck_prize_pool.iter().enumerate() {
+            Card::draw(
+                self.texture_dictionary[card.base_effects as usize],
+                screen_width() - 100.0,
+                screen_height() - (card_index as f32 * 145.0) - 145.0,
+                90.0,
+            )
+            .await;
+        }
+
         // Drawing each field.
         for field in 0..(self.player_fields.len()) {
             for (card_index, card) in self.player_fields[field].iter().enumerate() {
+                for (mutator_index, mutator_card) in card.modifier_effects.iter().enumerate() {
+                    Card::draw(
+                        self.texture_dictionary[mutator_card.base_effects as usize],
+                        (card_index as f32 * 110.0)
+                            + (field as f32 * 300.0)
+                            + ((mutator_index + 1) as f32 * 2.0)
+                            + 10.0,
+                        ((mutator_index + 1) as f32 * 65.0) + 10.0,
+                        130.0,
+                    )
+                    .await;
+                }
                 Card::draw(
                     self.texture_dictionary[card.base_effects as usize],
-                    card_index as f32 * 100.0 + 10.0,
-                    field as f32 * 145.0 + 10.0,
-                    90.0,
+                    (card_index as f32 * 110.0) + (field as f32 * 300.0) + 10.0,
+                    10.0,
+                    130.0,
                 )
                 .await;
             }
@@ -544,14 +596,17 @@ impl GameData {
         {
             Card::draw(
                 self.texture_dictionary[card.base_effects as usize],
-                500.0,
-                card_index as f32 * 160.0 + 10.0,
-                100.0,
+                card_index as f32 * 210.0 + 10.0,
+                screen_height() - 295.0,
+                200.0,
             )
             .await;
         }
 
-        ::std::thread::sleep(std::time::Duration::new(0, 200000000));
+        ::std::thread::sleep(std::time::Duration::new(
+            0,
+            (debug_wait_seconds * 1000000000.0) as u32,
+        ));
 
         next_frame().await; // Drawing that next frame.
     }
@@ -660,6 +715,7 @@ impl std::fmt::Debug for Card {
                 CardColor::Mutation => "\x1b[0;34m",
                 CardColor::Item => "\x1b[0;33m",
             },
+            // "[{:?}{}{}]",
             self.base_effects,
             if self.current_health.is_some() {
                 format!(
