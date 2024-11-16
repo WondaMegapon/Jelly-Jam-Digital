@@ -153,7 +153,8 @@ async fn main() {
                 };
             }
             GameState::InGame => {
-                let mut new_game = game_instance::GameData::new(2).unwrap();
+                macroquad::rand::srand(get_time() as u64);
+                let mut new_game = game_instance::GameData::new(4, 3).unwrap();
                 new_game.run().await;
                 state = GameState::Menu;
             }
