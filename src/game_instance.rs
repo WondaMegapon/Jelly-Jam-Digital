@@ -6,11 +6,20 @@ use macroquad::{
     texture::{draw_texture_ex, load_texture},
     window::{clear_background, next_frame},
 };
+use rodio::*;
 
-#[derive(Debug)]
-pub struct Player {}
+macro_rules! play_audio {
+    ($sink:ident, $file:expr $(,)?, $volume:expr $(,)?, $speed:expr $(,)?) => {
+        $sink.skip_one();
+        $sink.append(
+            Decoder::new_wav(Cursor::new(&include_bytes!($file)))
+                .unwrap()
+                .amplify($volume)
+                .speed($speed),
+        );
+    };
+}
 
-#[derive(Debug)]
 pub struct GameData {
     // All of the base data we'd want.
     pub deck_jelly: Vec<Card>, // This'll store all the jelly cards at game start.
@@ -27,6 +36,7 @@ pub struct GameData {
     pub player_fields: Vec<Vec<Card>>, // This'll store the battlefields of each player.
     pub player_placement: Vec<usize>, // This is tracking the placements for each round.
     pub player_victories: Vec<u8>,    // And this'll be for tracking wins.
+    pub player_humans: Vec<u8>,       // Tracking which players are humans.
 
     pub texture_dictionary: Vec<Texture2D>, // For storing all of the textures.
 
@@ -35,6 +45,13 @@ pub struct GameData {
     pub current_player: u8,
     pub current_round: u16,
     pub victory_threshold: u8,
+
+    // For music.
+    pub stream_output: OutputStream,
+    pub stream_handler: OutputStreamHandle, // Yeah this is important to keep.
+    pub sink_bass: Option<Sink>,            // Our bass. (Always playing)
+    pub sink_drums: Option<Sink>,           // Drums. (Plays when it's not your turn.)
+    pub sink_synth: Option<Sink>, // Synth. (Plays when it's not your turn *and* you're alive.)
 }
 
 impl GameData {
@@ -53,6 +70,7 @@ impl GameData {
                 Card::new_jelly(CardName::Chilli, 2, 1, 3),
                 Card::new_jelly(CardName::Junior, 2, 1, 3),
                 Card::new_jelly(CardName::Sling, 2, 1, 4),
+                Card::new_jelly(CardName::Strange, 1, 1, 2),
             ];
             let deck_creature = vec![
                 Card::new_creature(CardName::Zor, 3, 2, 3),
@@ -66,6 +84,7 @@ impl GameData {
                 Card::new_creature(CardName::Kibble, 2, 2, 4),
                 Card::new_creature(CardName::Taki, 3, 1, 3),
                 Card::new_creature(CardName::Paolarm, 3, 3, 3),
+                Card::new_creature(CardName::StrangeBlock, 1, 1, 2),
             ];
             let deck_mutation = vec![
                 Card::new_mutation(CardName::PitifulGaze),
@@ -117,7 +136,8 @@ impl GameData {
             }
             log::info!("Loaded {} items...", &deck_item.len());
             log::info!("Done loading!");
-            Some(GameData {
+            let (_stream, stream_handle) = OutputStream::try_default().unwrap(); // Creating our sinks.
+            let mut output = GameData {
                 deck_jelly: deck_jelly,
                 deck_creature: deck_creature,
                 deck_mutation: deck_mutation,
@@ -128,12 +148,22 @@ impl GameData {
                 player_fields: vec![Vec::new(); player_count.into()],
                 player_placement: Vec::new(),
                 player_victories: vec![0; player_count.into()],
+                player_humans: vec![0],
                 texture_dictionary: card_textures,
                 player_count: player_count,
                 current_player: player_count - 1,
                 current_round: 0,
                 victory_threshold: victory_threshold,
-            })
+                stream_output: _stream,
+                stream_handler: stream_handle,
+                sink_bass: None,
+                sink_drums: None,
+                sink_synth: None,
+            };
+            output.sink_bass = Some(Sink::try_new(&output.stream_handler).unwrap());
+            output.sink_drums = Some(Sink::try_new(&output.stream_handler).unwrap());
+            output.sink_synth = Some(Sink::try_new(&output.stream_handler).unwrap());
+            Some(output)
         } else {
             None
         }
@@ -185,7 +215,7 @@ impl GameData {
         loop {
             let selection = (macroquad::rand::rand() as usize) % source.len(); // Replace the macroquad:rand:rand() with the eventual selection the player makes.
             log::info!("Selected {:?}.", selection);
-            if (filter(selection)) {
+            if filter(selection) {
                 return selection;
             }
             log::info!("Please pick a different one.");
@@ -550,15 +580,72 @@ impl GameData {
     pub async fn draw(&mut self, debug_wait_seconds: f32) {
         clear_background(macroquad::color::WHITE); // Emptying the current buffer.
 
+        // Music's here, too.
+        {
+            // Handling volume.
+            // let current_drums_volume = self.sink_drums.as_mut().unwrap().volume();
+            // let current_synth_volume = self.sink_synth.as_mut().unwrap().volume();
+            self.sink_drums
+                .as_mut()
+                .unwrap()
+                .set_volume(!self.player_humans.contains(&self.current_player) as u32 as f32);
+            self.sink_synth.as_mut().unwrap().set_volume(
+                (!self.player_humans.contains(&self.current_player)
+                    && self.player_fields[self.current_player as usize].len() > 0)
+                    as u32 as f32,
+            );
+
+            // Gotta replesh the thingies.
+            if self.sink_synth.as_mut().unwrap().empty() {
+                self.sink_bass.as_mut().unwrap().append(
+                    Decoder::new_wav(std::io::Cursor::new(&include_bytes!(
+                        "../assets/sounds/music/insane_bass.wav"
+                    )))
+                    .unwrap(),
+                );
+                self.sink_drums.as_mut().unwrap().append(
+                    Decoder::new_wav(std::io::Cursor::new(&include_bytes!(
+                        "../assets/sounds/music/insane_drums.wav"
+                    )))
+                    .unwrap(),
+                );
+                self.sink_synth.as_mut().unwrap().append(
+                    Decoder::new_wav(std::io::Cursor::new(&include_bytes!(
+                        "../assets/sounds/music/insane_synth.wav"
+                    )))
+                    .unwrap(),
+                );
+            }
+        }
+
         // Time to draw everything.
         //
+
+        // Helper text.
+        draw_text_ex(
+            &format!(
+                "Round {} - Player {}'s Turn - Current Wins {:?} (Best of {})",
+                self.current_round + 1,
+                self.current_player,
+                self.player_victories,
+                self.victory_threshold
+            ),
+            10.0,
+            screen_height() - 6.0,
+            TextParams {
+                font_size: 24,
+                font_scale: 1.0,
+                color: macroquad::color::BLACK,
+                ..Default::default()
+            },
+        );
 
         // Prize pool first, since it's unimportant.
         for (card_index, card) in self.deck_prize_pool.iter().enumerate() {
             Card::draw(
                 self.texture_dictionary[card.base_effects as usize],
                 screen_width() - 100.0,
-                screen_height() - (card_index as f32 * 145.0) - 145.0,
+                screen_height() - (card_index as f32 * 136.0) - 136.0,
                 90.0,
             )
             .await;
@@ -574,7 +661,7 @@ impl GameData {
                             + (field as f32 * 300.0)
                             + ((mutator_index + 1) as f32 * 2.0)
                             + 10.0,
-                        ((mutator_index + 1) as f32 * 65.0) + 10.0,
+                        ((mutator_index + 1) as f32 * 60.0) + 10.0,
                         130.0,
                     )
                     .await;
@@ -597,7 +684,7 @@ impl GameData {
             Card::draw(
                 self.texture_dictionary[card.base_effects as usize],
                 card_index as f32 * 210.0 + 10.0,
-                screen_height() - 295.0,
+                screen_height() - 310.0,
                 200.0,
             )
             .await;
@@ -614,7 +701,7 @@ impl GameData {
 
 // For storing each card.
 #[derive(Clone, PartialEq, Eq)]
-struct Card {
+pub struct Card {
     // Stats
     color: CardColor,
     base_health: Option<i8>,     // The health (optional.)
@@ -645,7 +732,7 @@ impl Card {
             y,
             macroquad::color::WHITE,
             macroquad::texture::DrawTextureParams {
-                dest_size: Some(Vec2::new(size, size * 1.5)),
+                dest_size: Some(Vec2::new(size, size * 1.4)),
                 ..Default::default()
             },
         );
@@ -872,6 +959,7 @@ enum CardName {
     Kibble, // Kibble: +# from attack rolls made by this creature. (Kibble is silly)
     Taki,   // Taki: Add # point to this card's stats when put into play.
     Paolarm, // Paolarm: Can only target Jellies/Creatures that cannot currently move. (Sleepy?)
+    StrangeBlock, // Strange Block: +1 on rolls against all Creature cards.
 
     // Items
     //
@@ -898,6 +986,7 @@ enum CardName {
     Chilli, // Chilli: Freeze: Jellies that hit you with an attack cannot attack on their next turn.
     Junior, // Junior: Potential: Attach up to two mutation cards to this card.
     Sling, // Sling: Sling: This jelly does not take damage caused by Hazardous.
+    Strange, // Puzzle: +1 on rolls against all Jelly cards.
 
     // Mutations
     //

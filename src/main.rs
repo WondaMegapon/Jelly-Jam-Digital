@@ -7,7 +7,7 @@ mod view_item;
 mod view_jelly;
 mod view_mutation;
 use chrono::prelude::*;
-use macroquad::{prelude::*, window};
+use macroquad::prelude::*;
 use player_turn::TurnState;
 
 use error_chain::error_chain;
