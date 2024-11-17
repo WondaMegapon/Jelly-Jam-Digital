@@ -46,6 +46,8 @@ pub struct GameData {
     pub current_round: u16,
     pub victory_threshold: u8,
 
+    pub abort_game: bool, // And for force closing the game.
+
     // For music.
     pub stream_output: OutputStream,
     pub stream_handler: OutputStreamHandle, // Yeah this is important to keep.
@@ -154,6 +156,7 @@ impl GameData {
                 current_player: player_count - 1,
                 current_round: 0,
                 victory_threshold: victory_threshold,
+                abort_game: false,
                 stream_output: _stream,
                 stream_handler: stream_handle,
                 sink_bass: None,
@@ -311,6 +314,11 @@ impl GameData {
                     self.player_hands[self.current_player as usize]
                 );
                 self.draw(0.3).await; // Good to render before anything happens.
+
+                // If somebody wants to make it stop.
+                if self.abort_game {
+                    return; // Just leaaave.
+                }
 
                 // Middle turn.
                 if self.player_fields[self.current_player as usize].len() > 0 {
@@ -582,6 +590,9 @@ impl GameData {
     pub async fn draw(&mut self, debug_wait_seconds: f32) {
         clear_background(macroquad::color::Color::from_rgba(0, 128, 128, 255)); // Emptying the current buffer.
 
+        // Inputs too, 'cause this is a good periodic function.
+        self.abort_game = is_key_down(KeyCode::Escape);
+
         // Music's here, too.
         {
             // Handling volume.
@@ -696,7 +707,7 @@ impl GameData {
 
         ::std::thread::sleep(std::time::Duration::new(
             0,
-            (debug_wait_seconds * 1000000000.0) as u32,
+            !is_key_down(KeyCode::Space) as u32 * (debug_wait_seconds * 1000000000.0) as u32,
         ));
 
         next_frame().await; // Drawing that next frame.
