@@ -580,7 +580,7 @@ impl GameData {
 
     // For drawing everything to the screen.
     pub async fn draw(&mut self, debug_wait_seconds: f32) {
-        clear_background(macroquad::color::WHITE); // Emptying the current buffer.
+        clear_background(macroquad::color::Color::from_rgba(0, 128, 128, 255)); // Emptying the current buffer.
 
         // Music's here, too.
         {
@@ -639,7 +639,7 @@ impl GameData {
             TextParams {
                 font_size: 24,
                 font_scale: 1.0,
-                color: macroquad::color::BLACK,
+                color: macroquad::color::WHITE,
                 ..Default::default()
             },
         );
@@ -799,14 +799,14 @@ impl std::fmt::Debug for Card {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}[{:?}{}{}]\x1b[0m",
-            match self.color {
-                CardColor::Jelly => "\x1b[0;36m",
-                CardColor::Creature => "\x1b[0;31m",
-                CardColor::Mutation => "\x1b[0;34m",
-                CardColor::Item => "\x1b[0;33m",
-            },
-            // "[{:?}{}{}]",
+            // "{}[{:?}{}{}]\x1b[0m",
+            // match self.color {
+            //     CardColor::Jelly => "\x1b[0;36m",
+            //     CardColor::Creature => "\x1b[0;31m",
+            //     CardColor::Mutation => "\x1b[0;34m",
+            //     CardColor::Item => "\x1b[0;33m",
+            // },
+            "[{:?}{}{}]",
             self.base_effects,
             if self.current_health.is_some() {
                 format!(
