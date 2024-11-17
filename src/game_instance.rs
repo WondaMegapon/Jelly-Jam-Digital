@@ -163,6 +163,8 @@ impl GameData {
             output.sink_bass = Some(Sink::try_new(&output.stream_handler).unwrap());
             output.sink_drums = Some(Sink::try_new(&output.stream_handler).unwrap());
             output.sink_synth = Some(Sink::try_new(&output.stream_handler).unwrap());
+            output.sink_drums.as_mut().unwrap().set_volume(0.0);
+            output.sink_synth.as_mut().unwrap().set_volume(0.0);
             Some(output)
         } else {
             None
@@ -263,25 +265,24 @@ impl GameData {
         'round: loop {
             // Pre-round.
             log::info!("Starting Round {:?}.", self.current_round + 1);
-            self.draw(0.0).await;
             // Everybody plays two living cards.
             for _iterator in 0..self.player_count {
                 log::info!("Player {}, play two cards.", self.current_player);
                 for _iterator in 0..2 {
-                    self.draw(0.1).await;
+                    self.draw(0.2).await;
                     let mut selected_card = GameData::select_card(
                         &mut self.player_hands[self.current_player as usize],
                         |card| card.color == CardColor::Jelly || card.color == CardColor::Creature,
                     );
                     if selected_card.is_some() {
-                        self.draw(0.1).await;
+                        self.draw(0.2).await;
                         log::info!("Any mutations?");
                         let mutation_card = GameData::select_card(
                             &mut self.player_hands[self.current_player as usize],
                             |card| card.color == CardColor::Mutation,
                         );
                         if mutation_card.is_some() {
-                            self.draw(0.1).await;
+                            self.draw(0.2).await;
                             GameData::move_card(
                                 mutation_card.unwrap(),
                                 &mut selected_card.as_mut().unwrap().modifier_effects,
@@ -309,7 +310,7 @@ impl GameData {
                     "And your hand. {:?}",
                     self.player_hands[self.current_player as usize]
                 );
-                self.draw(0.2).await; // Good to render before anything happens.
+                self.draw(0.3).await; // Good to render before anything happens.
 
                 // Middle turn.
                 if self.player_fields[self.current_player as usize].len() > 0 {
@@ -332,14 +333,14 @@ impl GameData {
                     if !has_performed_action
                         && self.player_fields[self.current_player as usize].len() > 0
                     {
-                        self.draw(0.1).await;
+                        self.draw(0.2).await;
                         log::info!("Select attackers.");
                         let attacker = GameData::select_card(
                             &mut self.player_fields[self.current_player as usize],
                             |card| card.current_damage.is_some_and(|x| x > 0),
                         );
                         if attacker.as_ref().is_some() {
-                            self.draw(0.1).await;
+                            self.draw(0.2).await;
                             log::info!("Select who you're attacking.");
                             let target_field = GameData::select_hand(&self.player_fields, |hand| {
                                 hand != self.current_player as usize
@@ -350,7 +351,7 @@ impl GameData {
                                 &mut self.player_fields[target_field],
                                 |card| card.current_health.is_some(),
                             );
-                            self.draw(0.1).await;
+                            self.draw(0.2).await;
                             let roll = (macroquad::rand::rand() % 6 + 1) as i8;
                             if roll >= defender.as_ref().unwrap().current_defense.unwrap() {
                                 log::info!("{}! Successful roll!", roll);
@@ -411,18 +412,18 @@ impl GameData {
                         } else {
                             log::info!("No valid attackers.");
                         }
-                        self.draw(0.1).await;
+                        self.draw(0.2).await;
                     }
                     // Handling withdrawing.
                     if !has_performed_action {
-                        self.draw(0.1).await;
+                        self.draw(0.2).await;
                         log::info!("Select deserters.");
                         let mut deserter = GameData::select_card(
                             &mut self.player_fields[self.current_player as usize],
                             |_x| true,
                         );
                         if deserter.is_some() {
-                            self.draw(0.1).await;
+                            self.draw(0.2).await;
                             // has_performed_action = true;
                             while deserter.as_mut().unwrap().modifier_effects.len() > 0 {
                                 self.deck_loot.push(
@@ -451,7 +452,7 @@ impl GameData {
                 // End turn.
                 // Discard down to eight.
                 while self.player_hands[self.current_player as usize].len() > 8 {
-                    self.draw(0.1).await;
+                    self.draw(0.2).await;
                     log::info!("Please discard down to eight cards.");
                     let mut selected_card = GameData::select_card(
                         &mut self.player_hands[self.current_player as usize],
@@ -475,7 +476,7 @@ impl GameData {
                         self.deck_loot.push(selected_card.unwrap());
                         self.deck_loot.shuffle();
                     }
-                    self.draw(0.1).await;
+                    self.draw(0.2).await;
                 }
                 // And quietly performing the board check.
                 if self
@@ -492,7 +493,7 @@ impl GameData {
                     while self.player_fields[self.current_player as usize].len() > 0 {
                         let mut last_card = self.player_fields[self.current_player as usize].pop();
                         if last_card.is_some() {
-                            self.draw(0.1).await;
+                            self.draw(0.2).await;
                             log::info!("Moving {:?} back to hand.", last_card.as_ref().unwrap());
                             while last_card.as_mut().unwrap().modifier_effects.len() > 0 {
                                 GameData::move_card(
@@ -531,7 +532,7 @@ impl GameData {
 
             // Handling prizes.
             for iterator in 0..(self.player_placement.len() - 1) {
-                self.draw(0.1).await;
+                self.draw(0.2).await;
                 log::info!(
                     "Player {}, please pick a prize card.",
                     self.player_placement[iterator]
@@ -540,14 +541,14 @@ impl GameData {
                     GameData::select_card(&mut self.deck_prize_pool, |_x| true).unwrap(),
                     &mut self.player_hands[self.player_placement[iterator]],
                 );
-                self.draw(0.1).await;
+                self.draw(0.2).await;
             }
             self.player_placement.clear(); // Clearing the placement.
 
             // Moving our loot deck to the prize pool.
             log::info!("Here are the prize cards.");
             for _iterator in 0..(self.player_count - 1) {
-                self.draw(0.05).await;
+                self.draw(0.1).await;
                 GameData::draw_card(&mut self.deck_loot, &mut self.deck_prize_pool);
                 log::info!(
                     "A {:?} is in the prize pool!",
@@ -574,6 +575,7 @@ impl GameData {
         }
         // SOMEBODY WON!
         log::info!("And we have a winner!");
+        self.draw(10.0).await;
     }
 
     // For drawing everything to the screen.
@@ -583,20 +585,22 @@ impl GameData {
         // Music's here, too.
         {
             // Handling volume.
-            // let current_drums_volume = self.sink_drums.as_mut().unwrap().volume();
-            // let current_synth_volume = self.sink_synth.as_mut().unwrap().volume();
-            self.sink_drums
-                .as_mut()
-                .unwrap()
-                .set_volume(!self.player_humans.contains(&self.current_player) as u32 as f32);
+            let current_drums_volume = self.sink_drums.as_ref().unwrap().volume();
+            let current_synth_volume = self.sink_synth.as_ref().unwrap().volume();
+            self.sink_drums.as_mut().unwrap().set_volume(
+                current_drums_volume * 0.9
+                    + !self.player_humans.contains(&self.current_player) as u32 as f32 * 0.1,
+            );
             self.sink_synth.as_mut().unwrap().set_volume(
-                (!self.player_humans.contains(&self.current_player)
-                    && self.player_fields[self.current_player as usize].len() > 0)
-                    as u32 as f32,
+                current_synth_volume * 0.9
+                    + (!self.player_humans.contains(&self.current_player)
+                        && self.player_fields[self.player_humans[0] as usize].len() > 0)
+                        as u32 as f32
+                        * 0.1,
             );
 
             // Gotta replesh the thingies.
-            if self.sink_synth.as_mut().unwrap().empty() {
+            if self.sink_synth.as_mut().unwrap().len() < 2 {
                 self.sink_bass.as_mut().unwrap().append(
                     Decoder::new_wav(std::io::Cursor::new(&include_bytes!(
                         "../assets/sounds/music/insane_bass.wav"
